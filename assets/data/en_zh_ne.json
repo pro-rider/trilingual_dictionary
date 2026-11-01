@@ -1,0 +1,201 @@
+{
+  "dataset_version": 1,
+  "entries": [
+    {
+      "entry_id": "light",
+      "word_en": "light",
+      "word_zh": "光",
+      "senses": [
+        {
+          "sense_id": "light_noun_illumination",
+          "word_en": "light",
+          "word_zh": "光",
+          "pinyin": "guāng",
+          "ipa_en": "/laɪt/",
+          "part_of_speech": "noun",
+          "meaning_en": "Illumination that makes things visible",
+          "meaning_zh": "使物体可见的光",
+          "meaning_ne": "प्रकाश",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "The light is bright.",
+              "zh": "灯光很亮。",
+              "ne": "बत्तीको प्रकाश उज्यालो छ।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        },
+        {
+          "sense_id": "light_adj_not_heavy",
+          "word_en": "light",
+          "word_zh": "轻",
+          "pinyin": "qīng",
+          "ipa_en": "/laɪt/",
+          "part_of_speech": "adjective",
+          "meaning_en": "Not heavy; low in weight",
+          "meaning_zh": "重量小的",
+          "meaning_ne": "हल्का",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "This box is light.",
+              "zh": "这个箱子很轻。",
+              "ne": "यो बाकस हल्का छ।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "trade",
+      "word_en": "trade",
+      "word_zh": "贸易",
+      "senses": [
+        {
+          "sense_id": "trade_noun_commerce",
+          "word_en": "trade",
+          "word_zh": "贸易",
+          "pinyin": "màoyì",
+          "ipa_en": "/treɪd/",
+          "part_of_speech": "noun",
+          "meaning_en": "The buying and selling of goods and services",
+          "meaning_zh": "买卖商品或服务",
+          "meaning_ne": "व्यापार",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "Trade between the two countries is growing.",
+              "zh": "两国之间的贸易在增长。",
+              "ne": "दुई देशबीचको व्यापार बढ्दै गएको छ।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "mountain",
+      "word_en": "mountain",
+      "word_zh": "山",
+      "senses": [
+        {
+          "sense_id": "mountain_noun",
+          "word_en": "mountain",
+          "word_zh": "山",
+          "pinyin": "shān",
+          "ipa_en": "/ˈmaʊntɪn/",
+          "part_of_speech": "noun",
+          "meaning_en": "A large natural elevation of the earth's surface",
+          "meaning_zh": "高耸的地形",
+          "meaning_ne": "पहाड",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "We climbed the mountain.",
+              "zh": "我们爬了那座山。",
+              "ne": "हामी पहाड चढ्यौं।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "water",
+      "word_en": "water",
+      "word_zh": "水",
+      "senses": [
+        {
+          "sense_id": "water_noun",
+          "word_en": "water",
+          "word_zh": "水",
+          "pinyin": "shuǐ",
+          "ipa_en": "/ˈwɔːtə/",
+          "part_of_speech": "noun",
+          "meaning_en": "A clear liquid essential for life",
+          "meaning_zh": "生命所需的液体",
+          "meaning_ne": "पानी",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "Please give me a glass of water.",
+              "zh": "请给我一杯水。",
+              "ne": "कृपया मलाई एक गिलास पानी दिनुहोस्।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "book",
+      "word_en": "book",
+      "word_zh": "书",
+      "senses": [
+        {
+          "sense_id": "book_noun",
+          "word_en": "book",
+          "word_zh": "书",
+          "pinyin": "shū",
+          "ipa_en": "/bʊk/",
+          "part_of_speech": "noun",
+          "meaning_en": "A set of printed pages bound together",
+          "meaning_zh": "装订成册的印刷品",
+          "meaning_ne": "किताब",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "She is reading a book.",
+              "zh": "她在读一本书。",
+              "ne": "उनी एउटा किताब पढ्दै छिन्।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entry_id": "teacher",
+      "word_en": "teacher",
+      "word_zh": "老师",
+      "senses": [
+        {
+          "sense_id": "teacher_noun",
+          "word_en": "teacher",
+          "word_zh": "老师",
+          "pinyin": "lǎoshī",
+          "ipa_en": "/ˈtiːtʃə/",
+          "part_of_speech": "noun",
+          "meaning_en": "A person who teaches",
+          "meaning_zh": "教授知识的人",
+          "meaning_ne": "शिक्षक",
+          "meaning_ne_status": "published",
+          "meaning_ne_source": "dictionary",
+          "examples": [
+            {
+              "en": "The teacher explained the lesson.",
+              "zh": "老师讲解了这一课。",
+              "ne": "शिक्षकले पाठ बुझाए।",
+              "source": "reviewed",
+              "review_status": "approved"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

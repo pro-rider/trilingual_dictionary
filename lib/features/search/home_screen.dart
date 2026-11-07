@@ -60,6 +60,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         actions: [
           IconButton(
+            tooltip: 'Favorites',
+            onPressed: () => context.push('/favorites'),
+            icon: const Icon(Icons.bookmark_border),
+          ),
+          IconButton(
             tooltip: 'History',
             onPressed: () => context.go('/history'),
             icon: const Icon(Icons.history),
@@ -103,11 +108,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ? 'Search a word… e.g. light'
                   : '输入中文… 例如 光',
               prefixIcon: const Icon(Icons.search, color: LanguageColors.brand),
-              suffixIcon: IconButton(
-                tooltip: 'Search',
-                onPressed: () => _submit(_controller.text),
-                icon: const Icon(Icons.arrow_forward,
-                    color: LanguageColors.brand),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _controller,
+                    builder: (context, value, _) => value.text.isEmpty
+                        ? const SizedBox.shrink()
+                        : IconButton(
+                            tooltip: 'Clear',
+                            onPressed: () {
+                              _controller.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close, size: 18),
+                          ),
+                  ),
+                  IconButton(
+                    tooltip: 'Search',
+                    onPressed: () => _submit(_controller.text),
+                    icon: const Icon(Icons.arrow_forward,
+                        color: LanguageColors.brand),
+                  ),
+                ],
               ),
             ),
           ),

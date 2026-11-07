@@ -8,7 +8,7 @@ $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\
 # Flutter
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
 flutter analyze                 # 0 issues required
-flutter test                    # 11 tests, < 2 s
+flutter test                    # 13 tests, < 2 s
 
 # Backend
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
@@ -27,6 +27,7 @@ otherwise). No test needs the network, an API key, or Postgres.
 | Input language detection / normalisation | ✅ 5 tests (`test/widget_test.dart`) | — | no pinyin/mixed-script fuzz |
 | Settings & history persistence (mock prefs, load/save/clamp/cap) | ✅ 5 tests (`settings_history_test.dart`) | — | no migration test from older key names |
 | Favorites → detail navigation (go_router) | ✅ 1 widget test (`favorites_navigation_test.dart`) | — | no back-navigation assertion |
+| TTS language mapping | ✅ 2 unit tests (`tts_service_test.dart`) | — | engine output not asserted (audio is not observable) |
 | Health, search, sentence, popular, suggest | — | ✅ `test_api.py` (9) | no prefix/edge-case length tests |
 | Auth (503/401/valid) | — | ✅ `test_auth.py` (3) | no favorites/feedback success path (needs DB) |
 | Fallback sentence | — | ✅ in `test_api.py` | template wording not asserted |
@@ -39,7 +40,7 @@ otherwise). No test needs the network, an API key, or Postgres.
 | DB models / migrations | — | ❌ none | needs a Postgres fixture |
 | Performance | ❌ | ❌ | manual measurements only |
 
-Totals: **11 Dart tests, 35 Python tests**, all green on 2026‑11‑07.
+Totals: **13 Dart tests, 35 Python tests**, all green on 2026‑11‑07.
 
 ---
 

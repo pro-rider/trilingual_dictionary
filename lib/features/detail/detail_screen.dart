@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/tts_service.dart';
 import '../../data/providers.dart';
 import '../search/widgets/result_card.dart';
 import '../search/widgets/sense_selector.dart';
@@ -41,10 +42,32 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              Text(
-                '${entry.wordEn} · ${entry.wordZh}',
-                style: const TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.w800),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${entry.wordEn} · ${entry.wordZh}',
+                      style: const TextStyle(
+                          fontSize: 26, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Pronounce (Chinese)',
+                    onPressed: () => ref
+                        .read(ttsServiceProvider)
+                        .speak(senses[_senseIndex].wordZh,
+                            lang: SpeechLang.chinese),
+                    icon: const Icon(Icons.volume_up),
+                  ),
+                  IconButton(
+                    tooltip: 'Pronounce (English)',
+                    onPressed: () => ref
+                        .read(ttsServiceProvider)
+                        .speak(senses[_senseIndex].wordEn,
+                            lang: SpeechLang.english),
+                    icon: const Icon(Icons.record_voice_over_outlined),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               if (senses.length > 1) ...[

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/normalizer.dart';
+import '../../core/tts_service.dart';
 import '../../data/models/dictionary_entry.dart';
+import '../../data/models/sense.dart';
 import '../favorites/favorites_repository.dart';
 import 'search_provider.dart';
 import 'widgets/result_card.dart';
@@ -22,6 +25,44 @@ class ResultScreen extends ConsumerStatefulWidget {
 
 class _ResultScreenState extends ConsumerState<ResultScreen> {
   int _senseIndex = 0;
+
+  /// The sense currently on screen, read straight from the provider so the
+  /// toolbar no longer needs a data-dependent closure.
+  Sense? _currentSense() {
+    final entry =
+        ref.read(resultProvider(SearchArgs(widget.query, widget.lang))).value;
+    if (entry == null || entry.senses.isEmpty) return null;
+    final i = _senseIndex < entry.senses.length ? _senseIndex : 0;
+    return entry.senses[i];
+  }
+
+  void _speak() {
+    final sense = _currentSense();
+    if (sense == null) return;
+    // Speak the headword in the language the user typed in.
+    final service = ref.read(ttsServiceProvider);
+    if (widget.lang == InputLanguage.chinese) {
+      service.speak(sense.wordZh, lang: SpeechLang.chinese);
+    } else {
+      service.speak(sense.wordEn, lang: SpeechLang.english);
+    }
+  }
+
+  Future<void> _copy(Sense sense) async {
+    final buffer = StringBuffer()
+      ..writeln(sense.wordEn)
+      ..writeln('${sense.wordZh}  ${sense.pinyin}'.trim());
+    if (sense.meaningEn.isNotEmpty) buffer.writeln('EN: ${sense.meaningEn}');
+    if (sense.meaningZh.isNotEmpty) buffer.writeln('中文: ${sense.meaningZh}');
+    if (sense.meaningNe.isNotEmpty) buffer.writeln('नेपाली: ${sense.meaningNe}');
+    final example = sense.reviewedExample;
+    if (example != null) buffer.writeln('例: ${example.zh} / ${example.en}');
+    await Clipboard.setData(ClipboardData(text: buffer.toString().trim()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied to clipboard')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,10 +85,16 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         title: Text('“${widget.query}”'),
         actions: [
           IconButton(
+            tooltip: 'Pronounce',
+            onPressed: _speak,
+            icon: const Icon(Icons.volume_up, size: 20),
+          ),
+          IconButton(
             tooltip: 'Copy result',
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Copy — coming in v1.1')),
-            ),
+            onPressed: () {
+              final sense = _currentSense();
+              if (sense != null) _copy(sense);
+            },
             icon: const Icon(Icons.copy, size: 20),
           ),
         ],

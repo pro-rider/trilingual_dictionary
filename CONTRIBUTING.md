@@ -83,6 +83,19 @@ reach the network. Cleartext `http://` is enabled **only in the debug manifest**
 so a release build needs an HTTPS `API_BASE_URL`. iOS exempts `localhost` only.
 `flutter build apk --debug` is verified to produce a working APK (2026‑11‑07).
 
+Windows desktop builds need two machine-level prerequisites that are easy to trip over:
+
+1. **`nuget.exe` on `PATH`** — `flutter_tts` fetches its Windows speech dependency
+   through NuGet; without it CMake fails with `nuget.exe not found`. On this machine
+   it lives at `%LOCALAPPDATA%\Programs\nuget\nuget.exe`.
+2. **Plugin links** — Flutter registers Windows plugins by creating symlinks under
+   `windows\flutter\ephemeral\.plugin_symlinks`. Symbolic-link creation is blocked on
+   this machine (`mklink /D` returns "The parameter is incorrect"), so that folder
+   holds directory **junctions** instead: `mklink /J <link> <pub-cache package path>`,
+   one per entry under `plugins.windows` in `.flutter-plugins-dependencies`. If a build
+   fails with `PathNotFoundException: Cannot create link … errno = 2`, recreate the
+   missing junction instead of deleting the folder.
+
 ---
 
 ## 4. Checks before every commit

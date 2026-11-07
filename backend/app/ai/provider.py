@@ -274,6 +274,57 @@ def nepali_glosses_batch(items: list[tuple[str, str]]) -> dict[str, str]:
     return out
 
 
+def enrich_senses_batch(
+    items: list[tuple[str, str, str]]
+) -> dict[str, dict[str, str]]:
+    """Nepali gloss + one example sentence for a batch of senses.
+
+    ``items`` is ``[(key, chinese_headword, english_gloss), ...]``. One call
+    fills both fields because a dictionary without an example sentence is
+    useless to a learner, and paying two round-trips per sense doubles the
+    import time. Returns ``{key: {"ne","example_en","example_zh","example_ne"}}``;
+    a missing key means "retry later", never an empty placeholder.
+    """
+    if not ai_enabled() or not items:
+        return {}
+    lines = "\n".join(f"{k}\t{zh}\t{en}" for k, zh, en in items)
+    prompt = (
+        "You are a trilingual lexicographer writing a Chinese learners' "
+        "dictionary (English / Simplified Chinese / Nepali). Each line is "
+        "`key<TAB>chinese word<TAB>english gloss`. For each line produce:\n"
+        "1. ne: a SHORT Nepali gloss in Devanagari (2–6 words, dictionary "
+        "style, never a transliteration, never English letters).\n"
+        "2. example_en: ONE natural sentence (8–16 words) that actually uses "
+        "the English gloss as a word, not as an explanation.\n"
+        "3. example_zh: that same sentence in natural Simplified Chinese.\n"
+        "4. example_ne: that same sentence in Nepali (Devanagari).\n"
+        "Respond with STRICT JSON only:\n"
+        '{"items":[{"key":"<key>","ne":"<nepali>",'
+        '"example_en":"<sentence>","example_zh":"<sentence>",'
+        '"example_ne":"<sentence>"}]}\n'
+        "Every key must appear exactly once. No prose.\n\n" + lines
+    )
+    text, _winner, _stats = _service.complete(prompt)
+    if not text:
+        return {}
+    raw = _extract_json(text) or {}
+    items_out = raw.get("items") if isinstance(raw, dict) else raw
+    out: dict[str, dict[str, str]] = {}
+    for item in items_out or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        out[key] = {
+            "ne": str(item.get("ne") or "").strip(),
+            "example_en": str(item.get("example_en") or "").strip(),
+            "example_zh": str(item.get("example_zh") or "").strip(),
+            "example_ne": str(item.get("example_ne") or "").strip(),
+        }
+    return out
+
+
 def define_words_batch(words: list[str]) -> dict[str, dict[str, str]]:
     """Give English meaning + pinyin + Nepali for words missing from any source.
 

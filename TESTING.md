@@ -8,7 +8,7 @@ $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\
 # Flutter
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
 flutter analyze                 # 0 issues required
-flutter test                    # 16 tests, < 3 s
+flutter test                    # 19 tests, < 4 s
 
 # Backend
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
@@ -42,7 +42,7 @@ otherwise). No test needs the network, an API key, or Postgres.
 | DB models / migrations | — | ❌ none | needs a Postgres fixture |
 | Performance | ❌ | ❌ | manual measurements only |
 
-Totals: **16 Dart tests, 42 Python tests**, all green on 2026‑11‑08.
+Totals: **19 Dart tests, 42 Python tests**, all green on 2026‑11‑08.
 
 ---
 

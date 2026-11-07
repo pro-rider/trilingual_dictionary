@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    dictionary,
     auth,
     feedback,
     health,
@@ -18,6 +19,7 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(providers.router)
 api_router.include_router(search.router)
+api_router.include_router(dictionary.router)
 api_router.include_router(analyze.router)
 api_router.include_router(sentence.router)
 api_router.include_router(popular.router)

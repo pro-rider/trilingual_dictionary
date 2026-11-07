@@ -451,3 +451,81 @@ translations are blank rows, not bad data — rerun the tool to fill them.
 and therefore drops `hsk_level`, `ai_cache` and `corpus_hits`. After a rebuild,
 rerun `import_hsk5.py`, `import_exam_words.py` and re-warm `ai_cache`.
 
+## 14. Nepali + example-sentence coverage (2026‑11‑08, measured)
+
+CC-CEDICT ships Chinese + English only, so after the Stage 2 build the
+database had `gloss_zh` 0 / 198,306, `gloss_ne` 3,032 / 198,306 and
+`examples` 0 rows. That is why the phone showed an empty पिंक 中文 box and an
+empty नेपाली box for almost every word.
+
+Two mechanisms fill them, and neither one invents text:
+
+1. **On demand (live, free).** `POST /api/v1/dictionary/enrich` → the app writes
+   `gloss_ne` + one trilingual example into its own copy of the database
+   (`offline_dictionary.enrich`). Verified on the phone: Nepal → नेपाली
+   "हिमालयको देश" + 3-language sentence, China → "चीन देश" + sentence. Second
+   lookup is served from disk, offline included.
+2. **Bulk (background).** `backend/tools/enrich_dictionary.py` walks every sense
+   that still needs work and writes it back into `dictionary.sqlite`, so a
+   rebuilt asset ships pre-filled.
+
+Measured bulk throughput: **batch 25, threads 6 → 0.4 senses/s** (75 of 100 in
+174 s), limited by free-tier Gemini HTTP 429, not by our code. At that rate
+195,274 pending senses ≈ 135 h; `--primary-only` cuts it to 123,672 ≈ 85 h. So
+bulk is an overnight/overnight×n job, not a 10-minute one — run it when the
+machine can stay awake:
+
+```powershell
+cd ...\backend
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --dry-run
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --primary-only --batch 25 --threads 6
+```
+
+It is resumable (only empty senses are selected) and writes progress to
+`dictionary.sqlite.enrich.report.json` every minute. `ne_status` is set to
+`ai_translated` (never `reviewed`), so machine output stays distinguishable
+from reviewed entries.
+
+English lookup correctness (the "Nepal → 白眶雀鹛" class of bug): the glossary
+score in `backend/app/services/sqlite_dataset.py::_gloss_score` and its Dart
+twin in `lib/data/local/offline_dictionary.dart` both refuse a match inside a
+parenthetical, fetch every singular/plural form, and tie-break by main sense,
+non-proper, HSK, then the shortest gloss and shortest headword. Regression
+tests: `test/offline_dictionary_test.dart` (Nepal→尼泊尔, China→中国,
+behaviors→"behavior").
+
+### 14.1 Why "water" used to open on a surname (2026‑11‑08, second pass)
+
+Three data-shape problems were fixed, and each is now a repeatable tool run
+rather than a hand edit:
+
+1. **Sense 0 was not the main meaning.** CC-CEDICT frequently lists
+   `surname Shui` (水), `abbr. for …` (书), `variant of …` (那) or a brand
+   (`Apple (American tech company)` for 苹果) as sense 0, so opening a word
+   showed the surname. `backend/tools/reorder_senses.py` demotes those senses
+   to the end of the entry (temporary negative range first, so the
+   `(entry_id, sense_order)` unique index cannot collide). It touched
+   **1,353 entries / 1,523 senses** and is idempotent (second run: 0 / 0).
+   `sense_id` never changes, so Nepali glosses and examples stay on their sense.
+2. **Headword frequency was missing.** Without it `四大 #4,622` beat `水 #653`
+   and `册 #4,264` beat `书 #539`. `backend/tools/add_frequency.py` fills
+   `entries.freq_rank` from `wordfreq` (MIT): 116,533 / 123,672 entries in 3.8 s.
+3. **Scoring ranked phrases over words.** `middle age` counted as a hit for
+   `middle`, `in total there are …` for `in total`. A segment that merely
+   *starts with* the query now scores 60 (same as one that ends with it) instead
+   of 90, so a real definition (100) or an exact later alternative (85) wins.
+
+Final rank order, identical in both implementations:
+`(score_tier, sense_order, freq_rank IS NULL, freq_rank, len(gloss), len(headword), entry_id)`.
+
+Self-check tool `backend/tools/audit_roundtrip.py` takes each HSK5 word's own
+first English gloss as a query and requires the lookup to lead back to that
+word: **2,273 queries, 1,584 exact (69.7%)**. Mismatches are mostly harmless
+synonyms (`one` → 一个, `before` → 之前), so the number is a regression gauge
+that must not decrease. Report: `backend/data/build/audit.roundtrip.json`.
+
+Known remaining defects (documented, not fixed): a rare-but-valid compound can
+still win when its sense 0 is an exact match (`worse` → 禽兽不如,
+`mice` → 会奖旅游/MICE tourism), and a very frequent single character carrying
+an obscure sense can beat the everyday word (`beautiful` → 那). Both need
+curated overrides, which is the natural next data task.

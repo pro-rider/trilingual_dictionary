@@ -95,18 +95,31 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 
 ---
 
-## 4. Verified state (2026-11-07)
+## 4. Verified state (2026-11-08)
+
+| Check | Result |
+|---|---|
+| `flutter analyze` | No issues found |
+| `flutter test` | 19/19 passed |
+| `pytest` (backend) | 42/42 passed |
+| `GET /api/v1/health` | `200 {"status":"ok","version":"0.1.0","dataset_version":1}` |
+| `POST /api/v1/dictionary/enrich` | `200`, Nepali + one trilingual sentence per sense (20 senses/call) |
+| English lookup (backend) | `water→水`, `book→书`, `apple→苹果`, `fire→火`, `behaviors→行为`, `Nepal→尼泊尔`, `China→中国` |
+| Dictionary self-check | `tools/audit_roundtrip.py`: 2,273 HSK5 queries, 1,584 exact (69.7%) |
+| On the phone (`R9ZY40T6LXA`) | `Nepal` → नेपाली "हिमालयको देश" + 3-language sentence; `China` → 中国 + sentence; `teacher` → 老师 / शिक्षक + reviewed sentence |
+| Bundled asset | `assets/data/dictionary.sqlite.gz` 43.3 MB = 123,672 entries; APK 248.4 MB |
+| Git | `main` in sync with `origin/main` |
+
+### 4.1 Verified state (2026-11-07)
 
 | Check | Result |
 |---|---|
 | `flutter analyze` | No issues found |
 | `flutter test` | 13/13 passed |
 | `pytest` (backend) | 35/35 passed |
-| `GET /api/v1/health` | `200 {"status":"ok","version":"0.1.0","dataset_version":1}` |
 | `POST /api/v1/search` (`light`) | 2 senses, 3-language meanings + approved examples |
 | `POST /api/v1/analyze` (English) | `The early bird catches the worm.` → 1 idiom + punctuation, `degraded=false`, Nepali correct |
 | `POST /api/v1/analyze` (Chinese) | `今天天气很好，我们去公园散步。` → 今天 / 天气 / 很好 / 我们 / 去 / 公园 / 散步, `degraded=false` |
-| Git | `main` in sync with `origin/main`, working tree clean |
 
 ### Fixed in this pass
 
@@ -142,7 +155,7 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 
 | Priority | Gap | Notes |
 |---|---|---|
-| High | **Offline dataset is tiny** — the packaged asset `assets/data/en_zh_ne.json` holds only 6 entries. The 123,596-entry `backend/data/build/dictionary.sqlite` exists but is **not bundled in the app**, so offline search on a phone still finds 6 words. | Next step: ship the gzipped SQLite as an asset, copy it on first launch, query locally with sqflite. |
+| ~~High~~ done | ~~Offline dataset is tiny~~ | The whole 123,672-entry database now ships as `assets/data/dictionary.sqlite.gz` (§8.7); offline search finds every word. |
 | ~~High~~ done | ~~Backend isn't under version control~~ | `backend/` now lives inside this repo and ships in the same commit history; `.env` and `.venv/` remain ignored. |
 | Medium | Supabase auth unconfigured (`SUPABASE_URL` / `SUPABASE_JWT_SECRET` empty) | `/me`, favorites and feedback stay unauthenticated; sign-in screen can't complete. |
 | Medium | No CI | `flutter analyze` + `flutter test` + `pytest` all pass locally; nothing enforces them on push. |
@@ -174,15 +187,18 @@ the FastAPI backend live in the same repo; `backend/` is not a submodule.
 ```
 trilingual_dictionary/
 ├── lib/                 Flutter app source (all Dart code)
-├── test/                Flutter tests (5 files)
+├── test/                Flutter tests (6 files, 19 tests)
 ├── assets/data/         Data bundled INTO the app
-│   └── en_zh_ne.json    6 curated entries, the only offline dictionary today
+│   ├── en_zh_ne.json    6 curated demo entries (first hit in the search chain)
+│   └── dictionary.sqlite.gz   the WHOLE 123,672-entry database, gzipped (43.3 MB,
+│                         gitignored — regenerate locally, §8.7)
 ├── backend/             FastAPI service + data tools (separate Python venv)
 ├── android/ ios/ windows/ macos/ linux/ web/   platform runners (mostly generated)
 ├── pubspec.yaml         Flutter deps (dio, riverpod, go_router, supabase, flutter_tts, …)
 ├── analysis_options.yaml  Dart lint rules — `flutter analyze` must stay at 0 issues
-├── .gitignore           ignores build/, .dart_tool/, backend/.venv/, backend/data/
-└── *.md                 the 13 contract documents + this guide (see 7.5)
+├── .gitignore           ignores build/, .dart_tool/, backend/.venv/, backend/data/,
+│                        and assets/data/dictionary.sqlite.gz
+└── *.md                 the 12 contract documents + this guide (see 7.5)
 ```
 
 Generated / never edited by hand: `build/`, `.dart_tool/`, `.idea/`,
@@ -207,11 +223,14 @@ lib/
 │   └── errors/failures.dart      typed failures
 ├── data/
 │   ├── api_client.dart           Dio client: search, suggest, sentence, analyze,
-│   │                             images, health. Returns null on failure (never throws)
+│   │                             images, health, enrich. Returns null on failure (never throws)
 │   ├── providers.dart            Riverpod providers shared across features
 │   ├── dictionary_repository.dart  curated JSON snapshot → bundled SQLite database
 │   ├── local/offline_dictionary.dart  unpacks assets/data/dictionary.sqlite.gz once,
-│   │                             then SQL search over 123,672 entries (read-only)
+│   │                             then SQL search over 123,672 entries; enrich() writes
+│   │                             missing Nepali + examples back into that file.
+│   │                             `assetVersion` string + `<db>.stamp` sidecar decide
+│   │                             whether the bundled copy must be re-unpacked
 │   ├── auth_provider.dart        Supabase session state
 │   └── models/                   dictionary_entry, sense, example_sentence,
 │                                 analyzed_text, auth_state, signed_in_user, word_image
@@ -277,9 +296,10 @@ backend/
 │   │       ├── popular.py     GET /popular
 │   │       ├── analyze.py     POST /analyze/text
 │   │       ├── images.py      GET /images, GET /images/batch  (image pipeline)
+│   │       ├── dictionary.py  POST /dictionary/enrich  (Nepali + example, on demand)
 │   │       ├── health.py      GET /health
 │   │       └── auth.py, favorites.py, feedback.py, providers.py
-│   ├── schemas/               pydantic models (search.py, images.py)
+│   ├── schemas/               pydantic models (search.py, images.py, dictionary.py)
 │   ├── services/
 │   │   ├── dataset.py         JSON fixture loader + index (6 curated entries)
 │   │   ├── sqlite_dataset.py  123k-entry SQLite lookup: entry, suggest, stats
@@ -292,6 +312,13 @@ backend/
 │   └── scripts/               seed_database.py, validate_dataset.py
 ├── tools/
 │   ├── build_dictionary.py    CC-CEDICT → merged SQLite (entries/senses/FTS5/report)
+│   ├── enrich_dictionary.py   fills empty gloss_ne + examples (resumable, rate-limited)
+│   ├── import_hsk5.py         HSK5 list → hsk_level + Nepali gloss
+│   ├── import_exam_words.py   HSK5 past paper → missing words into the database
+│   ├── add_frequency.py       wordfreq → entries.freq_rank (how common the word really is)
+│   ├── reorder_senses.py      demotes surname / abbr. / variant / brand senses so
+│   │                          sense 0 is the real meaning (idempotent)
+│   ├── audit_roundtrip.py     self-check: every HSK5 word must find itself again
 │   └── fetch_images.py        Commons/Wikipedia → licence+quality gate → images tables
 ├── tests/                     pytest: api, auth, failover, quality, text_analysis (35)
 └── data/                      GITIGNORED, machine-local, reproducible
@@ -322,15 +349,22 @@ test/
 ├── widget_test.dart              Normalizer unit tests
 ├── settings_history_test.dart    persistence: save / load / clamp / cap
 ├── favorites_navigation_test.dart tap a favorite → /detail route
-└── tts_service_test.dart         TTS language mapping + fallback
+├── tts_service_test.dart         TTS language mapping + fallback
+└── offline_dictionary_test.dart  real 123k-entry database, opened read-write through
+                                  `OfflineDictionary(overridePath: …)`:
+                                  7 tests — raisin/葡萄干/Kishmish, 安排 has Nepali,
+                                  pinyin, Nepal→尼泊尔, China→中国,
+                                  behaviors→行为 (behaviour/behavior present),
+                                  enrichment is a no-op when the backend is down
 backend/tests/
 ├── test_api.py                   9 endpoint tests incl. 3-language meanings
 ├── test_auth.py, test_failover.py, test_quality.py
+├── test_english_lookup.py        English ranking: water/书/apple/fire/behaviors
 └── test_text_analysis.py         Chinese segmentation + phrase resolution
 ```
 
 Rule: a behaviour change without a test is not done. `flutter test` must stay green
-(13 today), `pytest` must stay green (35 today), `flutter analyze` at 0 issues.
+(**19 today**), `pytest` must stay green (**42 today**), `flutter analyze` at 0 issues.
 
 ### 7.5 The documents — what each one is for
 
@@ -465,27 +499,57 @@ airplane-mode'd. The asset is **not** committed (42.5 MB binary, and every
 rebuild would add another blob) — regenerate it locally before building:
 
 ```powershell
-cd ...\backend\data\build
-.venv\Scripts\python.exe -c "import gzip,shutil; i=open('dictionary.sqlite','rb'); o=gzip.open('dictionary.sqlite.gz','wb',compresslevel=9); shutil.copyfileobj(i,o); o.close(); i.close()"
-Copy-Item dictionary.sqlite.gz ...\trilingual_dictionary\assets\data\dictionary.sqlite.gz -Force
+cd ...\backend
+.venv\Scripts\python.exe -c "import gzip,shutil,sqlite3; db=r'data/build/dictionary.sqlite'; c=sqlite3.connect(db); c.execute('VACUUM'); c.close(); i=open(db,'rb'); o=gzip.open('dictionary.sqlite.gz','wb',compresslevel=9); shutil.copyfileobj(i,o); o.close(); i.close()"
+Copy-Item data\build\dictionary.sqlite.gz ...\trilingual_dictionary\assets\data\dictionary.sqlite.gz -Force
 
 cd ...\trilingual_dictionary
+# 1. bump OfflineDictionary.assetVersion in lib\data\local\offline_dictionary.dart
 flutter build apk --debug
 adb reverse tcp:8000 tcp:8000
 adb install -r build\app\outputs\flutter-apk\app-debug.apk
 ```
 
-Measured: 96 MB → 42.5 MB in 31 s; APK 196 MB → 230.8 MB; first launch unpacks
-in the background (`lib\data\local\offline_dictionary.dart`, `gzip.decode` inside
-`Isolate.run`, written to `getApplicationSupportDirectory()/dictionary.sqlite`),
-later launches reopen the file read-only with no work.
+Measured: 96 MB → **43.3 MB** in ~90 s (incl. `VACUUM`); APK **248.4 MB**;
+first launch unpacks in the background
+(`lib\data\local\offline_dictionary.dart`, `gzip.decode` inside `Isolate.run`,
+written to `getApplicationSupportDirectory()/dictionary.sqlite`), later launches
+reopen the file (read-write, because enrichment writes into it). First-run unpack
+of 43 MB takes ~30 s on the test phone — the UI shows a spinner meanwhile.
 
 Search order on the phone: curated JSON snapshot (6 demo entries) →
 `OfflineDictionary` (exact / traditional / prefix for 中文; tone-less pinyin, then
-`match_score` over `gloss_en` for English) → backend API → AI. If the database
-was rebuilt, the asset **must** be regenerated, or the phone keeps the old words.
+`_bestEnglishRow` for English, which scores only the definition part of
+`gloss_en`, tries singular/plural forms, and refuses a match that sits inside a
+parenthetical) → on-demand enrichment (below) → backend API → AI.
 
-### 8.8 Quality gate before any push
+**If the asset is rebuilt without bumping `assetVersion`, the phone keeps the
+old words forever** — it is holding its own copy, not the APK's. See §9.2.
+
+### 8.8 Fill Nepali glosses and example sentences
+
+CC-CEDICT has no Nepali and no example sentences, so most words open with an
+empty नेपाली box and no sentence. Two ways to fill them:
+
+**(a) Live, per lookup — already automatic.** With the backend reachable, the
+app sends the senses it is about to show (`POST /api/v1/dictionary/enrich`),
+writes the answer into its own database, and re-renders. The first lookup of a
+word needs the network; every later lookup of the same word works offline.
+
+**(b) Bulk, into the SQLite file** (so the shipped asset is pre-filled):
+
+```powershell
+cd ...\backend
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --dry-run
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --primary-only --batch 25 --threads 6
+```
+
+Resumable (`--limit 100` for a smoke test). Measured **0.4 senses/s** on
+free-tier keys (Gemini 429 is the ceiling) → 195,274 pending ≈ 135 h, so run it
+overnight and rebuild the asset afterwards (§8.7). Report:
+`data\build\dictionary.sqlite.enrich.report.json`.
+
+### 8.9 Quality gate before any push
 
 ```powershell
 cd ...\backend;  .venv\Scripts\python.exe -m pytest -q
@@ -493,7 +557,7 @@ cd ...;          flutter analyze
                  flutter test
 ```
 
-### 8.9 Commit and push
+### 8.10 Commit and push
 
 ```powershell
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
@@ -506,13 +570,109 @@ git push origin main
 Do not commit `backend/data/*`, `.env`, `.venv/`. If a doc describes behaviour
 you changed, update that doc in the same commit (§7.5).
 
-### 8.10 Common failures
+### 8.11 Common failures
 
 | Symptom | Fix |
 |---|---|
 | App shows "Offline mode · backend not reachable" | backend not running, or `adb reverse` lost — run §8.1 then §8.2 tunnel |
-| `No entry found` offline | expected: only 6 bundled entries (§5) |
+| A new word still shows the OLD meaning after a rebuild | `OfflineDictionary.assetVersion` was not bumped — see §9.2 |
 | Backend 500 on `/search` | read `dictionary.report.json`; confirm `data/build/dictionary.sqlite` exists |
 | `PathNotFoundException … errno = 2` on Windows build | plugin junction broken — recreate with `mklink /J` under `windows\flutter\ephemeral\.plugin_symlinks` |
 | `LNK1168` on desktop build | old `trilingual_dictionary.exe` still running — stop it first |
 | Images missing for a word | no approved image yet; `/images` returns `items: []` + icon by design |
+| `adb devices` empty while the phone is plugged in | `adb kill-server; adb start-server`; if still empty, re-plug the cable |
+
+---
+
+## 9. Maintenance runbook — "I changed X, what do I run?"
+
+Everything is generated from `backend/data/build/dictionary.sqlite`. **Nothing in
+`backend/data/` is in git**, so a fresh clone has to rebuild it (§8.3) and then
+replay §9.1 in order.
+
+### 9.1 Rebuild order (after `build_dictionary.py`)
+
+| # | Command (from `backend/`) | What it adds | Measured |
+|---|---|---|---|
+| 1 | `tools\import_hsk5.py --pdf "<新HSK5词汇表.pdf>"` | `hsk_level=5` + Nepali for 2,477 words | 313.8 s |
+| 2 | `tools\import_exam_words.py --corpus data\exam\h51007_passages.txt` | past-paper words missing from HSK5 (76 new) | 86.7 s |
+| 3 | `tools\add_frequency.py` | `entries.freq_rank` from `wordfreq` — decides which of two valid words wins | 3.8 s |
+| 4 | `tools\reorder_senses.py` | moves surname / abbr. / variant / brand senses to the end | 1,353 entries |
+| 5 | `tools\enrich_dictionary.py --primary-only` (optional, slow) | Nepali + example sentences baked into the file | 0.4 senses/s |
+| 6 | gzip + copy to `assets\data\` (§8.7) | ships the new data in the APK | 31 s |
+| 7 | bump `assetVersion` (§9.2) | makes the phone accept the new file | — |
+| 8 | `flutter build apk --debug` + `adb install -r` | | 23 s |
+
+`build_dictionary.py` wipes `ai_cache`, `corpus_hits`, `hsk_level`, `gloss_ne`,
+`examples`, `freq_rank` and the sense order — that is why steps 1–4 exist and why
+they must be run again after every rebuild.
+
+### 9.2 The version stamp — the one rule you must not forget
+
+The phone writes Nepali glosses and sentences into **its own copy** of the
+database, so it cannot simply re-read the APK asset. Each install is compared
+against `OfflineDictionary.assetVersion`
+(`lib\data\local\offline_dictionary.dart`) and a sidecar
+`<app support dir>\dictionary.sqlite.stamp`:
+
+* constant matches stamp → open the existing file (keeps everything enriched)
+* constant missing/mismatched → delete the file, unpack the bundled asset again
+
+**Every time you regenerate `assets/data/dictionary.sqlite.gz`, change that
+string** (e.g. `'2026-11-08.3'` → `'2026-11-09.1'`). Otherwise the APK ships new
+data that the phone never opens.
+
+### 9.3 "A word shows the wrong meaning" — the diagnosis path
+
+1. Reproduce **in the database, not on the phone**:
+   ```powershell
+   cd ...\backend; $env:PYTHONPATH=(Get-Location).Path
+   .venv\Scripts\python.exe -c "from app.services import sqlite_dataset as sd; print(sd.find_entry('water','en'))"
+   ```
+   `test\offline_dictionary_test.dart` does the same through the Dart code path.
+2. See what the database actually holds for that word:
+   ```sql
+   SELECT e.entry_id, e.freq_rank, e.is_proper, s.sense_order, s.gloss_en, s.gloss_ne
+   FROM entries e JOIN senses s ON s.entry_id = e.entry_id
+   WHERE e.simplified = '<汉字>' ORDER BY s.sense_order;
+   ```
+3. Three usual causes and their fix:
+
+| Cause | Symptom | Fix |
+|---|---|---|
+| A non-lexical sense is first | opens on `surname X` / `abbr. for X` | `tools\reorder_senses.py` (idempotent) |
+| A rarer word outranks the common one | `fire` → 发射 instead of 火 | `tools\add_frequency.py` (fills `freq_rank`) |
+| The match sits inside a parenthetical | `Nepal` → “Nepal fulvetta” | scoring in `_gloss_score` / `_glossScore` — it must never read inside brackets |
+
+4. After a **database** fix: §9.1 steps 6–8 (repack, bump, reinstall).
+   After a **scoring** fix (Dart/Python only): just rebuild the APK.
+
+### 9.4 Measuring dictionary quality
+
+```powershell
+cd ...\backend
+$env:PYTHONPATH=(Get-Location).Path
+.venv\Scripts\python.exe tools\audit_roundtrip.py
+```
+
+It takes each HSK5 word's own first English gloss as a query and checks the
+lookup returns that same word: **2,273 queries, 1,584 exact (69.7%), 689
+mismatches** on 2026-11-08 (report `data\build\audit.roundtrip.json`). Most
+mismatches are legitimate synonyms (`one` → 一个, `before` → 之前), which is why
+the number is a *regression gauge*, not a pass/fail gate: it must not go down.
+
+Coverage today (`dictionary.sqlite`):
+
+| Field | Filled | Total |
+|---|---|---|
+| entries | 123,672 | — |
+| senses | 198,306 | — |
+| `gloss_ne` | 3,107 | 198,306 |
+| `examples` rows | 75 | — |
+| `freq_rank` | 116,533 | 123,672 |
+| `gloss_zh` | 0 (renders as the headword instead) | 198,306 |
+
+Nepali and example sentences are therefore **filled on demand** (first lookup
+while online writes them into the phone's database, §8.8a) rather than
+pre-generated — pre-generating 195k senses at 0.4 senses/s is ≈5–6 days on the
+free-tier keys.

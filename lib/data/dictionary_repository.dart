@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/errors/failures.dart';
 import '../core/normalizer.dart';
+import 'api_client.dart';
 import 'local/offline_dictionary.dart';
 import 'models/dictionary_entry.dart';
 
@@ -16,10 +17,16 @@ import 'models/dictionary_entry.dart';
 class DictionaryRepository {
   final AssetBundle _bundle;
   final OfflineDictionary? offline;
+
+  /// Optional backend used to fill missing Nepali / example sentences.
+  final ApiClient? api;
+  final bool Function()? isOnline;
+
   List<DictionaryEntry> _entries = const [];
   bool _loaded = false;
 
-  DictionaryRepository(this._bundle, {this.offline});
+  DictionaryRepository(this._bundle,
+      {this.offline, this.api, this.isOnline});
 
   /// Unpack the bundled database in the background so the first search is
   /// instant. Failures are swallowed here — [search] surfaces them by
@@ -48,10 +55,18 @@ class DictionaryRepository {
 
   /// Search by English or 中文 input. Returns the first matching entry:
   /// the curated snapshot first, then the full bundled database.
+  ///
+  /// When the backend is reachable and the offline entry has no Nepali gloss
+  /// or no example sentence, one enrichment call fills them and they are
+  /// written into the on-device database, so the next lookup is free offline.
   Future<DictionaryEntry?> search(String query, InputLanguage lang) async {
     final curated = await _searchSnapshot(query, lang);
     if (curated != null) return curated;
-    return offline?.search(query, lang);
+    final entry = await offline?.search(query, lang);
+    if (entry == null) return null;
+    final api = this.api;
+    if (api == null || !(isOnline?.call() ?? false)) return entry;
+    return offline?.enrich(entry, api) ?? entry;
   }
 
   Future<DictionaryEntry?> _searchSnapshot(

@@ -87,6 +87,44 @@ class ApiClient {
     }
   }
 
+  /// Fill missing Nepali glosses + example sentences for the senses the user
+  /// just opened. Returns `{key: {ne, example_en, example_zh, example_ne}}`,
+  /// empty when offline — the app then stores what it got locally.
+  Future<Map<String, Map<String, String>>> enrich(
+      List<MapEntry<String, String>> items) async {
+    if (items.isEmpty) return const {};
+    try {
+      final resp = await _dio.post(
+        '/api/v1/dictionary/enrich',
+        data: {
+          'items': [
+            for (final item in items) {
+              // key<TAB>chinese<TAB>english: the key is an opaque handle the
+              // server echoes back, so the caller never has to parse it.
+              'key': item.key,
+              'zh': item.value.split('\u0001').first,
+              'en': item.value.split('\u0001').last,
+            }
+          ]
+        },
+      );
+      final list = (resp.data as Map?)?['items'] as List? ?? const [];
+      final out = <String, Map<String, String>>{};
+      for (final raw in list) {
+        final map = raw as Map<String, dynamic>;
+        out[map['key'] as String] = {
+          'ne': map['ne'] as String? ?? '',
+          'example_en': map['example_en'] as String? ?? '',
+          'example_zh': map['example_zh'] as String? ?? '',
+          'example_ne': map['example_ne'] as String? ?? '',
+        };
+      }
+      return out;
+    } catch (_) {
+      return const {};
+    }
+  }
+
   /// Analyze a word / phrase / sentence / paragraph into per-unit meanings.
   /// Returns null when offline / on error (the screen degrades gracefully).
   Future<AnalyzedText?> analyzeText(String text, InputLanguage lang) async {

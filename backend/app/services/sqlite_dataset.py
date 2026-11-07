@@ -15,6 +15,7 @@ Every query here is read-only and parameterised; no string interpolation.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
@@ -72,6 +73,142 @@ def _short_gloss(gloss: str) -> str:
     return head or gloss.strip()
 
 
+_ARTICLES = ("to ", "a ", "an ", "the ")
+
+
+def _strip_article(piece: str) -> str:
+    p = piece.strip().lower()
+    for art in _ARTICLES:
+        if p.startswith(art):
+            return p[len(art):].strip()
+    return p
+
+
+def _english_queries(raw: str) -> list[str]:
+    """Typed forms to try: the word itself plus its singular / plural."""
+    q = raw.strip().lower()
+    out = [q]
+    if q.endswith("es") and len(q) > 4:
+        out.append(q[:-2])
+    if q.endswith("s") and len(q) > 3:
+        out.append(q[:-1])
+    elif len(q) >= 3:
+        out.append(q + "s")
+    return [v for v in dict.fromkeys(out) if v]
+
+
+def _score_tier(score: int) -> int:
+    """Collapse the raw score into a band so frequency can decide between
+    "the definition IS this word" (100) and "this word is one of the
+    definitions" (85). Without this, "behaviors" picks 品行 (glossed exactly
+    "behavior") over the word people actually mean, 行为."""
+    if score >= 85:
+        return 0
+    if score >= 75:
+        return 1
+    if score >= 60:
+        return 2
+    return 3
+
+
+def _gloss_score(gloss: str, queries: list[str]) -> int:
+    """How well an English gloss defines the typed word.
+
+    A gloss like ``(bird species of China) Nepal fulvetta`` must NOT answer
+    "Nepal": the word only appears inside a parenthetical explanation of a
+    different headword. So scoring only looks at the *definition part* (text
+    before the first bracket) and only at its leading segments, then at
+    whole-word occurrences there:
+
+    100  a segment IS the word (after stripping to/a/an/the)
+     90  a segment starts with the word ("to arrange", "arrange; plan")
+     60  the word ends a segment ("to put ... in order" + "order")
+     40  the word appears as a whole word in the definition part
+      0  no defensible match -> the caller must return None, never a guess
+    """
+    text = (gloss or "").strip().lower()
+    definition = text.split("(")[0]
+    segments = [s for s in re.split(r"[;,/]", definition) if s.strip()]
+
+    best = 0
+    for idx, segment in enumerate(segments):
+        piece = _strip_article(segment)
+        # The first segment is the head definition; a hit there is worth more
+        # than a hit buried among later semicolon alternatives (东土 = "the East;
+        # China" must lose to 中国 = "China").
+        for q in queries:
+            if piece == q:
+                return 100 if idx == 0 else 85
+            # "middle age" is not a definition of "middle", and "in total
+            # there are ..." is not a definition of "in total": a longer
+            # phrase that merely starts with the query is only a weak hit.
+            if piece.startswith(q + " ") or piece.startswith(q + "'s"):
+                best = max(best, 60)
+            elif piece.endswith(" " + q):
+                best = max(best, 60)
+    if best:
+        return best
+
+    for q in queries:
+        if re.search(rf"(?<![a-z]){re.escape(q)}(?![a-z])", definition):
+            return 40
+    return 0
+
+
+def _best_english_row(con: sqlite3.Connection, q_lower: str) -> sqlite3.Row | None:
+    """Rank every gloss containing the word, then keep the best one."""
+    queries = _english_queries(q_lower)
+    candidates: list[sqlite3.Row] = []
+    # Every inflected form must be fetched, not just the typed one: the SQL used
+    # to filter on "%behaviors%" only, so 行为 ("action; conduct; behavior")
+    # never entered the ranking and "behaviors" returned nothing.
+    seen: set[int] = set()
+    for q in queries:
+        # Order by frequency *before* the LIMIT: with an unordered LIMIT the
+        # commonest headword (水 for "water") can be cut off entirely, and a
+        # rare entry answers instead.
+        rows = con.execute(
+            "SELECT e.*, s.gloss_en, s.sense_order "
+            "FROM senses s JOIN entries e ON e.entry_id = s.entry_id "
+            "WHERE LOWER(s.gloss_en) LIKE '%' || ? || '%' "
+            "ORDER BY e.freq_rank IS NULL, e.freq_rank, LENGTH(s.gloss_en) "
+            "LIMIT 400",
+            (q,),
+        ).fetchall()
+        for row in rows:
+            key = (row["entry_id"], row["sense_order"])
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(row)
+
+    best: sqlite3.Row | None = None
+    best_key: tuple = ()
+    for row in candidates:
+        score = _gloss_score(row["gloss_en"] or "", queries)
+        if score < 40:
+            continue
+        # Rank the way a learner expects. Score first, but banded so usage can
+        # decide between "the definition IS this word" (100) and "this word is
+        # one of its definitions" (85). Then how often the word is really used
+        # (wordfreq: 水 #653 beats 四大 #4,622; 书 #539 beats 册 #4,264; 行为
+        # #476 beats 品行 #35,279). `is_proper` is deliberately NOT used: the
+        # build flags a whole entry when any sense is a name (水 carries a
+        # surname sense, 书 an abbreviation sense), which made rare entries win.
+        key = (
+            _score_tier(score),
+            row["sense_order"],
+            row["freq_rank"] is None,
+            row["freq_rank"] or 0,
+            len(row["gloss_en"] or ""),
+            len(row["simplified"] or ""),
+            row["entry_id"],
+        )
+        if best is None or key < best_key:
+            best, best_key = row, key
+    return best
+
+
 def _row_to_entry(con: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     senses = con.execute(
         "SELECT sense_id, sense_order, gloss_en, gloss_zh, gloss_ne, ne_status "
@@ -82,6 +219,10 @@ def _row_to_entry(con: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     sense_list = []
     for sense in senses:
         gloss = sense["gloss_en"] or ""
+        # CC-CEDICT ships no Chinese gloss, so the 中文 block would render as an
+        # empty pink box on the phone. Fall back to the headword itself — that is
+        # what a Chinese reader wants to see there anyway.
+        meaning_zh = sense["gloss_zh"] or row["simplified"]
         sense_list.append(
             {
                 "sense_id": f"zh{row['entry_id']}:{sense['sense_order']}",
@@ -91,9 +232,7 @@ def _row_to_entry(con: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
                 "ipa_en": "",
                 "part_of_speech": "",
                 "meaning_en": gloss,
-                # Empty until the Kaikki import / Nepali run land; the client
-                # renders these blocks as "pending", never as translations.
-                "meaning_zh": sense["gloss_zh"] or "",
+                "meaning_zh": meaning_zh,
                 "meaning_ne": sense["gloss_ne"] or "",
                 "meaning_ne_status": (
                     "published" if sense["ne_status"] == "reviewed" else "pending"
@@ -101,6 +240,15 @@ def _row_to_entry(con: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
                 "examples": [],
             }
         )
+
+    # For an English lookup, show the sense that actually matched first:
+    # "apple" used to open on 苹果's sense 0 "Apple (American tech company)".
+    matched_order = row["sense_order"] if "sense_order" in row.keys() else None
+    if matched_order is not None:
+        at = next((i for i, s in enumerate(sense_list)
+                   if s["sense_id"].endswith(f":{matched_order}")), -1)
+        if at > 0:
+            sense_list.insert(0, sense_list.pop(at))
 
     first = sense_list[0] if sense_list else None
     return {
@@ -158,28 +306,10 @@ def find_entry(query: str, lang: str) -> dict[str, Any] | None:
 
         # English gloss. A plain "shortest match wins" rule is wrong: "arrange"
         # used to return 布局 ("arrangement") while 安排 ("to arrange") existed,
-        # because "to arrange" is longer. Score candidates instead: lead articles
-        # and "to"/"a"/"the" are stripped, an exact gloss beats a prefix, a whole
-        # word beats a substring, and HSK5 words (the ones learners actually
-        # meet) get a bonus.
-        row = con.execute(
-            "SELECT e.*, s.gloss_en, "
-            " CASE WHEN LOWER(TRIM(s.gloss_en)) IN (?, ?, ?, ?) THEN 3 "
-            "      WHEN LOWER(s.gloss_en) LIKE ? || ' %' OR LOWER(s.gloss_en) "
-            "           LIKE 'to ' || ? || '%' OR LOWER(s.gloss_en) LIKE ? || ',%' "
-            "        THEN 2 "
-            "      WHEN LOWER(s.gloss_en) LIKE '% ' || ? || ' %' OR LOWER(s.gloss_en) "
-            "           LIKE '% ' || ? THEN 1 "
-            "      ELSE 0 END AS match_score "
-            "FROM senses s JOIN entries e ON e.entry_id = s.entry_id "
-            "WHERE LOWER(s.gloss_en) LIKE '%' || ? || '%' AND e.is_proper = 0 "
-            "ORDER BY match_score DESC, s.sense_order, "
-            "         (e.hsk_level IS NOT NULL) DESC, "
-            "         LENGTH(s.gloss_en), e.entry_id "
-            "LIMIT 1",
-            (q_lower, "to " + q_lower, "a " + q_lower, "the " + q_lower,
-             q_lower, q_lower, q_lower, q_lower, q_lower, q_lower),
-        ).fetchone()
+        # because "to arrange" is longer. Candidates are scored instead (see
+        # _gloss_score) and a score of 0 means "no answer", never a guess:
+        # searching "Nepal" must return 尼泊尔, not the bird "Nepal fulvetta".
+        row = _best_english_row(con, q_lower)
         if row is not None:
             return _row_to_entry(con, row)
     finally:

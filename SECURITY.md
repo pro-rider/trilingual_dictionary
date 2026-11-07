@@ -56,16 +56,17 @@ about a person is server-side and encrypted at rest in production.**
 | Dev (phone on LAN) | plain `http://<lan-ip>:8000` | acceptable on a trusted network **only**; do not use on public Wi‑Fi |
 | Staging / production | **does not exist** | HTTPS with a valid certificate; backend behind a reverse proxy |
 
-Consequences already in the codebase:
+Consequences of the current configuration:
 
-- **Android release** manifest lacks `INTERNET`; cleartext HTTP is blocked by
-  default on Android 9+. If you add them, add them **per build type**: allow
-  cleartext in the debug manifest only (`android:usesCleartextTraffic="true"` or
-  a `network_security_config.xml` limited to the dev host). Never enable global
-  cleartext in the release manifest.
-- **iOS** `Info.plist` has no `NSAppTransportSecurity`; `http://` is blocked by
-  ATS. Use an `NSExceptionDomains` entry for `localhost` in a **debug** plist, or
-  run an HTTPS backend. Do not set `NSAllowsArbitraryLoads`.
+- **Android:** `INTERNET` is declared in the **main** manifest, so release builds
+  can reach the network. Cleartext HTTP is allowed **only in the debug manifest**
+  (`android:usesCleartextTraffic="true"`); release builds keep Android's default
+  (cleartext blocked, HTTPS required). Never move that attribute into the main
+  manifest.
+- **iOS:** `Info.plist` has a narrow ATS exception — `NSAllowsLocalNetworking` plus
+  an `NSExceptionDomains` entry for `localhost` — so the simulator can reach the
+  local dev backend over `http://`. A physical iPhone using a LAN IP still needs
+  its own exception entry, and `NSAllowsArbitraryLoads` must never be set.
 - There is no certificate pinning; acceptable while TLS validation is on.
 - CORS default is `["*"]`. Acceptable for local tools with no cookies/credentials;
   before any deployment set an explicit origin list and never combine `*` with
@@ -100,8 +101,8 @@ Consequences already in the codebase:
 |---|---|---|---|
 | Supabase session | SDK default (`shared_preferences`-backed) | none beyond OS sandbox | `flutter_secure_storage` if threat model includes rooted devices |
 | Favorites | `shared_preferences` (plain) | none | acceptable (non-secret), document it |
-| History | RAM | none | if persisted, keep it optional and clearable |
-| Settings | RAM | n/a | — |
+| History | `shared_preferences` key `history`, max 20, user-clearable | none | non-secret; "clear history" exists in the UI |
+| Settings | `shared_preferences` keys `settings.*` | none | non-secret |
 | Cached dictionary | app bundle | none (public data) | — |
 
 Do not store tokens, emails, or feedback drafts in plain preferences. If you
@@ -111,7 +112,8 @@ persist history, add a "clear history" action in the same change.
 
 ## 6. Platform hardening gaps (must be fixed before publishing)
 
-1. `android/app/src/main/AndroidManifest.xml` — no `INTERNET` permission; add it.
+1. ~~`INTERNET` permission missing~~ — fixed in the main manifest; cleartext is
+   debug-only.
 2. Release `signingConfig = signingConfigs.getByName("debug")` — **must** be
    replaced with a real keystore before any distribution; debug-signed releases
    are not publishable and are trivially re-signable.

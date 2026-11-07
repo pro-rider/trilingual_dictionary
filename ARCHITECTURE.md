@@ -159,12 +159,14 @@ reachable" (there is no local segmentation in Dart).
 | Data | Store | Persistence |
 |---|---|---|
 | Favorites | `shared_preferences` list `favorites` (+ optional Supabase) | yes |
-| Search history | `historyProvider` (max 20, dedup, newest first) | **no — in-memory only** |
-| Settings | `settingsProvider` | **no — resets each launch** |
+| Search history | `shared_preferences` list `history`, max 20, deduped | yes (user can clear) |
+| Settings | `shared_preferences` keys `settings.*` | yes (loaded on first read) |
 | Dictionary | `assets/data/en_zh_ne.json` (read-only bundle) | shipped asset |
 
-`shared_preferences` is already a dependency; persisting settings/history is a
-small, well-scoped change (see `CHANGE-SCOPE.md` §5).
+Settings and history hydrate lazily: `build()` returns defaults/empty immediately,
+then a disk read applies the stored values. Both notifiers expose `ready` for
+tests; UI keeps watching the providers and rebuilds when hydration lands. A user
+change made before hydration completes wins (`_dirty` guard).
 
 ### 2.8 Error strategy
 
@@ -269,16 +271,19 @@ and bump `AppConstants.datasetVersion` / `DATASET_VERSION`.
 1. **No domain/use-case layer** — documented deviation, not a target.
 2. **Dictionary JSON is read per request** — fine at 6 entries, must be cached
    before the dataset grows past ~1k entries.
-3. **Settings and history are not persisted** despite `shared_preferences` being
-   available.
-4. **`FavoritesScreen` uses `Navigator.pushNamed`** on a `MaterialApp.router`
-   shell; this has no named-route table and is a runtime error. Must use
-   `context.push('/detail/<id>')`.
-5. **Android release build lacks `INTERNET`** (only the debug manifest declares
-   it) and cleartext `http://` is blocked by default on modern Android.
-6. **No pagination / rate limiting / request IDs** anywhere in the API.
-7. **Postgres dictionary path is unimplemented** even though models and a seeder
+3. **Favorites are written from two places** — the app talks to the Supabase
+   table directly; the backend `/favorites` endpoints use Postgres. They can
+   diverge.
+4. **No pagination / rate limiting / request IDs** anywhere in the API.
+5. **Postgres dictionary path is unimplemented** even though models and a seeder
    exist.
-8. **Selected sense is lost on navigation.** `ResultScreen` pushes
+6. **Selected sense is lost on navigation.** `ResultScreen` pushes
    `/detail/<id>?sense=<index>`, but `DetailScreen` only receives `entryId`, so
    tapping the second sense of `light` opens the detail view on sense 0.
+7. **iOS on a physical device** still needs an ATS exception for the LAN IP
+   (the `Info.plist` exception covers `localhost` / local networking only).
+
+Fixed in the current build: persistence of settings and history; favorites
+navigation (`context.push`); `INTERNET` permission in the release manifest with
+debug-only cleartext.
+

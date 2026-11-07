@@ -78,9 +78,10 @@ Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
 (Invoke-RestMethod http://127.0.0.1:8000/api/v1/providers) | ConvertTo-Json -Depth 6
 ```
 
-Known build caveats: the Android **release** manifest has no `INTERNET` permission
-and cleartext `http://` is blocked on Android 9+/iOS ATS. Debug builds on desktop
-work today; see `SECURITY.md` §6 before building for a device.
+Build caveats: `INTERNET` is in the main manifest, so both debug and release can
+reach the network. Cleartext `http://` is enabled **only in the debug manifest**,
+so a release build needs an HTTPS `API_BASE_URL`. iOS exempts `localhost` only.
+`flutter build apk --debug` is verified to produce a working APK (2026‑11‑07).
 
 ---
 

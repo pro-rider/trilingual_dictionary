@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../data/dictionary_repository.dart';
@@ -57,8 +58,7 @@ class FavoritesScreen extends ConsumerWidget {
                     title: Text(e.en),
                     subtitle: Text(e.zh),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () =>
-                        Navigator.of(context).pushNamed('/detail/${e.id}'),
+                    onTap: () => context.push('/detail/${e.id}'),
                   );
                 },
               );

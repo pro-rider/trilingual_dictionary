@@ -8,7 +8,7 @@ $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\
 # Flutter
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
 flutter analyze                 # 0 issues required
-flutter test                    # 5 tests, < 1 s
+flutter test                    # 11 tests, < 2 s
 
 # Backend
 cd C:\Users\Administrator\Desktop\Dictionery\backend
@@ -25,19 +25,21 @@ otherwise). No test needs the network, an API key, or Postgres.
 | Area | Flutter | Backend | Gap |
 |---|---|---|---|
 | Input language detection / normalisation | ✅ 5 tests (`test/widget_test.dart`) | — | no pinyin/mixed-script fuzz |
+| Settings & history persistence (mock prefs, load/save/clamp/cap) | ✅ 5 tests (`settings_history_test.dart`) | — | no migration test from older key names |
+| Favorites → detail navigation (go_router) | ✅ 1 widget test (`favorites_navigation_test.dart`) | — | no back-navigation assertion |
 | Health, search, sentence, popular, suggest | — | ✅ `test_api.py` (9) | no prefix/edge-case length tests |
 | Auth (503/401/valid) | — | ✅ `test_auth.py` (3) | no favorites/feedback success path (needs DB) |
 | Fallback sentence | — | ✅ in `test_api.py` | template wording not asserted |
 | Quality gate + romanisation | — | ✅ `test_quality.py` (3) | 0.5 placeholder is untested by design |
 | Text analysis (zh/en, stopwords, degrade, AI shapes, span merge) | — | ✅ `test_text_analysis.py` (12) | no adversarial Unicode |
 | Failover (retry/429/circuit/all-down/metrics) | — | ✅ `test_failover.py` (8) | no real-provider contract test |
-| Widgets / screens | ❌ none | — | biggest gap |
-| Router / navigation | ❌ none | — | favorites-nav bug would have been caught |
+| Widgets / screens | partial (favorites screen) | — | other screens untested |
+| Router / navigation | ✅ 1 (favorites → detail) | — | other routes untested |
 | Repository / dataset decode | ❌ none | partial | no JSON-schema test |
 | DB models / migrations | — | ❌ none | needs a Postgres fixture |
 | Performance | ❌ | ❌ | manual measurements only |
 
-Totals: **5 Dart tests, 35 Python tests**, all green on 2026‑11‑07.
+Totals: **11 Dart tests, 35 Python tests**, all green on 2026‑11‑07.
 
 ---
 
@@ -149,7 +151,7 @@ Rules:
 | Long text at 1.4× scale | overflow regressions |
 | Devanagari rendering | font fallback; assert the glyph string is present |
 | `AnalyzeScreen` with `degraded: true` | banner text appears |
-| Navigation: favorites tap | currently broken — a test would have caught it |
+| Navigation: favorites tap | covered by `favorites_navigation_test.dart` |
 
 ---
 
@@ -217,5 +219,5 @@ A change is done when **all** of these hold:
 5. New behaviour has at least one test that fails without the change.
 6. The relevant contract document is updated.
 
-Known-issue tests that are currently red (none — the suites are green; the
-favorites-navigation defect is only observable at runtime).
+No tests are currently red. Defects that remain (sense selection, favorites dual
+write) are not yet observable from the suite; add tests when they are fixed.

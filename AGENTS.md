@@ -203,13 +203,10 @@ Keep it short. Do not paste whole files back to the user; summarise the diff.
 
 Until fixed, treat these as documented, not as new findings:
 
-- `FavoritesScreen` uses `Navigator.pushNamed` on a go_router app → tapping a
-  favorite fails.
 - `DetailScreen` ignores the `?sense=` index passed by `ResultScreen`, so a
   multi-sense word always opens on its first sense.
-- Android **release** manifest has no `INTERNET` permission; cleartext `http://`
-  is blocked by default on Android 9+.
-- Settings and search history are not persisted across launches.
+- iOS on a physical device still needs an ATS exception for the LAN IP (only
+  `localhost` / local networking is exempted).
 - Backend reads the dataset JSON on every request (no cache).
 - Favorites sync writes directly to Supabase from the app; the backend
   `/favorites` endpoints exist but the app does not use them.

@@ -194,7 +194,6 @@ iOS: one simulator pass for layout/ATS is enough until a device is available.
 - Worst-case failover latency (≈240 s) exceeds the app's 25 s timeout.
 - First Chinese analysis after restart pays a ~390 ms jieba load.
 - No AI result cache: repeated unknown words cost a full LLM call each time.
-- Flutter startup/memory/frame budgets have never been measured on a device, and
-  the release build currently cannot reach the network at all (missing `INTERNET`
-  permission), so profile-mode device measurements must be done against a build
-  with the network permission present.
+- Flutter startup/memory/frame budgets have never been measured on a device.
+  Measure with `--profile` against an HTTPS backend (release blocks cleartext) or
+  with a debug build for local HTTP.

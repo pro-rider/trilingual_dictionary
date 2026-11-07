@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'history_provider.dart';
 
-/// Search history with clear-all (v1 in-memory; SQLite is a later phase).
+/// Search history with clear-all (persisted in shared_preferences).
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 

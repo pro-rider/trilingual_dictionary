@@ -53,7 +53,7 @@ Android emulator is the emulator itself, hence the `10.0.2.2` override.
 
 ```powershell
 cd ..\backend; .venv\Scripts\python.exe -m pytest -q      # 35 passed
-cd ..\trilingual_dictionary; flutter analyze; flutter test # 0 issues, 5 passed
+cd ..\trilingual_dictionary; flutter analyze; flutter test # 0 issues, 11 passed
 ```
 
 ---
@@ -100,7 +100,7 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 | Check | Result |
 |---|---|
 | `flutter analyze` | No issues found |
-| `flutter test` | 5/5 passed |
+| `flutter test` | 11/11 passed |
 | `pytest` (backend) | 35/35 passed |
 | `GET /api/v1/health` | `200 {"status":"ok","version":"0.1.0","dataset_version":1}` |
 | `POST /api/v1/search` (`light`) | 2 senses, 3-language meanings + approved examples |
@@ -123,6 +123,18 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 6. Added English proverbs (early bird / practice makes perfect / better late
    than never / actions speak louder than words) to the idiom DB.
 7. `jieba>=0.42.1` added to `requirements.txt`.
+
+### Fixed in the documentation pass
+
+1. **Favorites tap failed** — `Navigator.pushNamed` replaced with `context.push`;
+   covered by `test/favorites_navigation_test.dart`.
+2. **Release build had no network** — `INTERNET` moved into the main manifest;
+   cleartext allowed only in the debug manifest; iOS gets a `localhost` ATS
+   exception. `flutter build apk --debug` verified.
+3. **Settings/history reset on restart** — both now persist in
+   `shared_preferences` (hydrate-on-build with a `ready` future);
+   `test/settings_history_test.dart` covers save/load/clamp/cap.
+4. The twelve project documents (`AGENTS.md` … `CONTRIBUTING.md`) were added.
 
 ---
 

@@ -36,10 +36,15 @@ Two separate config systems:
 | Physical phone | `http://<host-LAN-IP>:8000` | same Wi‑Fi; backend must bind `0.0.0.0` |
 | Web (`flutter run -d chrome`) | LAN IP, not `127.0.0.1` | browser origin restrictions; Supabase is disabled on web |
 
-Blockers for non-desktop targets (see `SECURITY.md` §6): the Android **release**
-manifest has no `INTERNET` permission, and cleartext `http://` is blocked on
-Android 9+ / iOS ATS unless a dev-only exception is added. Until then, HTTP works
-in debug builds only.
+Networking constraints for non-desktop targets (see `SECURITY.md` §3):
+
+- `INTERNET` is declared in the **main** manifest, so debug and release builds can
+  both reach the network.
+- Cleartext `http://` is allowed **only in debug** (`android/app/src/debug/AndroidManifest.xml`);
+  release builds require HTTPS. On iOS, `Info.plist` exempts `localhost` /
+  local networking only — a physical iPhone on a LAN IP needs its own exception.
+- So: `http://` + `127.0.0.1` works on desktop, Android emulator and iOS
+  simulator in debug; a release build needs an HTTPS backend.
 
 ### 1.2 `ApiConfig.timeout`
 
@@ -73,7 +78,7 @@ that file's comment and with `backend/app/models/cloud.py`).
 |---|---|---|
 | debug | `flutter run` | local, cleartext allowed |
 | profile | `flutter run --profile` | same |
-| release | `flutter build apk --release` | **blocked today** (no INTERNET in release manifest) |
+| release | `flutter build apk --release` | works, but **cleartext HTTP is blocked** — needs an HTTPS `API_BASE_URL` |
 
 There are no product flavors (`dev`/`staging`/`prod`); the only switch is
 `API_BASE_URL` via `--dart-define`.

@@ -149,7 +149,7 @@ Never relax ATS/cleartext globally for production.
 
 | Situation | Correct scope | Wrong scope |
 |---|---|---|
-| Tapping a favorite crashes | replace `Navigator.pushNamed` with `context.push` in `favorites_screen.dart` | rewriting favorites to use the backend |
+| Tapping a favorite crashes | was: replace `Navigator.pushNamed` with `context.push` — now implemented | rewriting favorites to use the backend |
 | Nepali missing on a dataset word | fix that dataset entry in both copies | editing the AI prompt |
 | Chinese split into single characters | segmenter fix + test | rewriting the analyzer |
 | Settings reset on restart | persist in `settings_provider` | introducing Hive/Isar |
@@ -164,9 +164,10 @@ These are real defects. Each needs its own change with the listed companion upda
 
 | Item | Scope of a correct fix | Risk if done carelessly |
 |---|---|---|
-| Favorites tap failure | 1 line + manual walk | none |
-| Release `INTERNET` permission + dev cleartext policy | manifest(s) + `SECURITY.md` §6 + release build test | security regression if cleartext is enabled globally |
-| Persist settings/history | provider + `shared_preferences` + load-on-start | race at startup; tests must run with a temp store |
+| ~~Favorites tap failure~~ — **fixed** (`context.push` + widget test) | done | — |
+| ~~Release `INTERNET` + dev cleartext~~ — **fixed** (main manifest + debug-only cleartext + iOS localhost ATS exception) | done | — |
+| ~~Persist settings/history~~ — **fixed** (`shared_preferences`, hydrate-on-build, `ready` future, tests) | done | — |
+| Sense selection lost on detail open | pass `?sense=` through the router into `DetailScreen` | wrong index after dataset edits |
 | Single favorites implementation | decide Supabase-table vs backend; remove the other; migrate existing ids | data loss |
 | Cache dictionary JSON | `services/dataset.py` + invalidation on version change | stale data after deploy |
 | `GEMINI_MODEL` example vs default | align `.env.example` with `config.py` (or vice versa) + `ENV-CONTRACTS.md` | silent provider failures |

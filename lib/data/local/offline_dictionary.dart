@@ -28,7 +28,7 @@ class OfflineDictionary {
   /// phone keeps its own copy of the database (it writes Nepali glosses and
   /// example sentences into it), so a plain "file exists" check would silently
   /// keep serving the old words forever.
-  static const String assetVersion = '2026-11-08.3';
+  static const String assetVersion = '2026-11-08.4';
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.

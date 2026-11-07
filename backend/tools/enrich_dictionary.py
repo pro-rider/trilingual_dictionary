@@ -39,15 +39,18 @@ from app.ai.provider import ai_enabled, enrich_senses_batch  # noqa: E402
 PRIMARY_SQL = """
 SELECT s.sense_id, s.sense_order, s.gloss_en, e.simplified, e.entry_id
 FROM senses s JOIN entries e ON e.entry_id = s.entry_id
-WHERE (s.gloss_ne IS NULL OR s.gloss_ne = '')
-   AND NOT EXISTS (SELECT 1 FROM examples x WHERE x.sense_id = s.sense_id)
+WHERE ((s.gloss_ne IS NULL OR s.gloss_ne = '')
+   OR NOT EXISTS (SELECT 1 FROM examples x WHERE x.sense_id = s.sense_id))
 """
 
 
-def pending_rows(con: sqlite3.Connection, primary_only: bool, limit: int | None) -> list[tuple]:
+def pending_rows(con: sqlite3.Connection, primary_only: bool, limit: int | None,
+                 hsk_only: bool = False) -> list[tuple]:
     sql = PRIMARY_SQL
     if primary_only:
         sql += " AND s.sense_order = 0"
+    if hsk_only:
+        sql += " AND e.hsk_level = 5"
     sql += " ORDER BY s.sense_id"
     if limit:
         sql += f" LIMIT {int(limit)}"
@@ -61,6 +64,9 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=25)
     ap.add_argument("--threads", type=int, default=6)
     ap.add_argument("--primary-only", action="store_true")
+    ap.add_argument("--hsk-only", action="store_true",
+                    help="restrict to the 2,477 HSK5-tagged entries (the words the "
+                         "student actually studies); ~1.7 h on free-tier keys")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", default=None)
     args = ap.parse_args()
@@ -77,9 +83,10 @@ def main() -> int:
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA synchronous=NORMAL")
 
-    rows = pending_rows(con, args.primary_only, args.limit)
+    rows = pending_rows(con, args.primary_only, args.limit, args.hsk_only)
     total = len(rows)
-    print(f"pending senses: {total:,} (primary_only={args.primary_only})")
+    print(f"pending senses: {total:,} (primary_only={args.primary_only}, "
+          f"hsk_only={args.hsk_only})")
     if args.dry_run:
         sample = rows[:8]
         for r in sample:

@@ -540,14 +540,23 @@ word needs the network; every later lookup of the same word works offline.
 
 ```powershell
 cd ...\backend
+$env:PYTHONPATH=(Get-Location).Path
 .venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --dry-run
-.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite --primary-only --batch 25 --threads 6
+# HSK5 first — it is what the student actually studies (2,477 senses, ~90 min):
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite `
+  --hsk-only --primary-only --batch 25 --threads 5
+# then everything else, if you have the time:
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite `
+  --primary-only --batch 25 --threads 6
 ```
 
-Resumable (`--limit 100` for a smoke test). Measured **0.4 senses/s** on
-free-tier keys (Gemini 429 is the ceiling) → 195,274 pending ≈ 135 h, so run it
-overnight and rebuild the asset afterwards (§8.7). Report:
-`data\build\dictionary.sqlite.enrich.report.json`.
+`--hsk-only` restricts the run to `hsk_level = 5`; `--primary-only` to sense 0.
+The selection is "Nepali missing **or** sentence missing", so re-running continues
+where it stopped. Measured **0.5 senses/s** (Gemini HTTP 429 and groq empty
+responses are the ceiling; the failover chain still completes the batch). Result
+on 2026-11-08: **HSK5 2,477/2,477 primary senses have Nepali + one trilingual
+sentence** (123 done in 262.8 s, then the remaining 2,354 backfilled). Report:
+`data\build\hsk5.examples.report.json`.
 
 ### 8.9 Quality gate before any push
 
@@ -661,18 +670,31 @@ mismatches** on 2026-11-08 (report `data\build\audit.roundtrip.json`). Most
 mismatches are legitimate synonyms (`one` → 一个, `before` → 之前), which is why
 the number is a *regression gauge*, not a pass/fail gate: it must not go down.
 
-Coverage today (`dictionary.sqlite`):
+Coverage today (`dictionary.sqlite`, 2026-11-08):
 
 | Field | Filled | Total |
 |---|---|---|
 | entries | 123,672 | — |
 | senses | 198,306 | — |
-| `gloss_ne` | 3,107 | 198,306 |
-| `examples` rows | 75 | — |
+| HSK5 primary senses with Nepali | **2,477 / 2,477 (100 %)** | 2,477 |
+| `gloss_ne` (all senses) | 3,230 | 198,306 |
+| `examples` rows | 327 → growing (HSK5 backfill job) | — |
 | `freq_rank` | 116,533 | 123,672 |
 | `gloss_zh` | 0 (renders as the headword instead) | 198,306 |
 
-Nepali and example sentences are therefore **filled on demand** (first lookup
+To finish the HSK5 sentence backfill (≈2,354 senses, ~0.5 senses/s ≈ 75 min):
+
+```powershell
+cd ...\backend
+$env:PYTHONPATH=(Get-Location).Path
+.venv\Scripts\python.exe tools\enrich_dictionary.py --db data\build\dictionary.sqlite `
+  --hsk-only --primary-only --batch 25 --threads 5 --report data\build\hsk5.examples.report.json
+```
+
+It is resumable and skips senses that already have a sentence, so re-running it
+just continues where it stopped. When it finishes: §9.1 steps 6–8.
+
+Beyond HSK5, Nepali and example sentences are **filled on demand** (first lookup
 while online writes them into the phone's database, §8.8a) rather than
-pre-generated — pre-generating 195k senses at 0.4 senses/s is ≈5–6 days on the
+pre-generated — pre-generating all 195k senses at 0.5 senses/s is ≈4.5 days on
 free-tier keys.

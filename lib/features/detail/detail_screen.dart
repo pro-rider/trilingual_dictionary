@@ -5,6 +5,7 @@ import '../../core/tts_service.dart';
 import '../../data/providers.dart';
 import '../search/widgets/result_card.dart';
 import '../search/widgets/sense_selector.dart';
+import '../search/widgets/word_image_card.dart';
 
 /// Full detail for an entry — all senses stacked.
 class DetailScreen extends ConsumerStatefulWidget {
@@ -81,6 +82,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
               for (var i = 0; i < senses.length; i++)
                 if (i == _senseIndex)
                   ResultCard(sense: senses[i]),
+              const SizedBox(height: 14),
+              WordImageCard(entryId: entry.entryId),
             ],
           );
         },

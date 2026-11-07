@@ -11,6 +11,7 @@ import '../favorites/favorites_repository.dart';
 import 'search_provider.dart';
 import 'widgets/result_card.dart';
 import 'widgets/sense_selector.dart';
+import 'widgets/word_image_card.dart';
 
 /// Shows the 3-language result for a search.
 class ResultScreen extends ConsumerStatefulWidget {
@@ -152,6 +153,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         ),
         const SizedBox(height: 4),
         ResultCard(sense: sense),
+        const SizedBox(height: 14),
+        // Picture for this entry, loaded separately so the meaning never waits
+        // on the network (stage 44 of the image plan).
+        WordImageCard(entryId: entry.entryId),
       ],
     );
   }

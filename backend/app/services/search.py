@@ -1,14 +1,23 @@
 from app.schemas.search import EntryOut, ExampleSentenceOut, SenseOut
 from app.services.dataset import find_entry, load_entries
+from app.services import sqlite_dataset
 from app.ai.provider import generate_draft
 
 
 def dictionary_search(query: str, lang: str) -> EntryOut | None:
-    """Look up a word and return the canonical 3-language entry."""
+    """Look up a word and return the canonical 3-language entry.
+
+    Order: curated fixture (reviewed Chinese + Nepali) → merged SQLite
+    dictionary (123k entries, meanings pending) → None.
+    """
     entry = find_entry(query, lang)
-    if entry is None:
-        return None
-    return _to_entry(entry)
+    if entry is not None:
+        return _to_entry(entry)
+
+    wide = sqlite_dataset.find_entry(query, lang)
+    if wide is not None:
+        return _to_entry(wide)
+    return None
 
 
 def dictionary_search_with_ai(query: str, lang: str) -> EntryOut | None:
@@ -73,6 +82,14 @@ def suggest(query: str, lang: str, limit: int = 6) -> list[str]:
             out.append(word)
         if len(out) >= limit:
             break
+
+    # Top up from the merged dictionary so autocomplete is not capped at 6 words.
+    if len(out) < limit:
+        for word in sqlite_dataset.suggest(query, lang, limit - len(out)):
+            if word and word not in out:
+                out.append(word)
+            if len(out) >= limit:
+                break
     return out
 
 

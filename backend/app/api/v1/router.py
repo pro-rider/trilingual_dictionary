@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     feedback,
     health,
+    images,
     popular,
     providers,
     search,
@@ -21,6 +22,7 @@ api_router.include_router(analyze.router)
 api_router.include_router(sentence.router)
 api_router.include_router(popular.router)
 api_router.include_router(suggest.router)
+api_router.include_router(images.router)
 api_router.include_router(auth.router)
 api_router.include_router(favorites.router)
 api_router.include_router(feedback.router)

@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     dataset_path: str = "data/seed/en_zh_ne.json"
     dataset_version: int = 1
 
+    # Merged SQLite dictionary built by tools/build_dictionary.py. Used as a
+    # coverage fallback after the curated JSON fixture; ignored when missing.
+    dictionary_db_path: str = "data/build/dictionary.sqlite"
+    # Public base URL the client should use for image files served by /static.
+    image_base_url: str = ""
+    # Where fetch_images.py wrote the thumbnails/detail files.
+    images_dir: str = "data/images"
+
     # PostgreSQL authoritative source (future). Not required to run in v1.
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@localhost:5432/trilingual_dictionary"

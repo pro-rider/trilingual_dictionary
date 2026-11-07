@@ -302,3 +302,73 @@ senses, 805,499 English gloss words → ≈6.04 M input + 1.29 M output tokens,
 ≈9,912 requests at 20 senses per request. Cost: **≈$2.6 on a cheap flash-class
 model, ≈$28 on GPT-class pricing**. This must be run after the Chinese definitions
 are filled, otherwise sense selection happens without context.
+
+---
+
+## 12. Image pipeline (Prompt 38–46): what is built, what is measured
+
+**Code:** `backend/tools/fetch_images.py` (collect → licence gate → quality gate →
+match → store) and `GET /api/v1/images`, `/api/v1/images/batch`.
+
+**Sources wired:** Wikimedia Commons only (MediaWiki API, official endpoint,
+descriptive User-Agent, retry with exponential backoff on 429/503). The `Source`
+interface exists so Wikidata/Openverse/Flickr/Open-Images plugins can be added
+without touching the pipeline. No scraper for a platform whose terms forbid it.
+
+**Licence gate (measured on real calls):** allow-list `CC0 | Public domain |
+CC BY | CC BY-SA`; NC / ND / unknown / missing author are rejected with a stored
+reason. The licence is read from the source's own `extmetadata`, not from a cache.
+Because attribution is mandatory under CC BY / CC BY-SA, an image whose author
+cannot be resolved is rejected even when the licence itself is fine.
+
+**Quality gate implemented:** mime ∈ jpeg/png/webp, width ≥ 400 px, aspect ratio
+0.4–2.5, dimensions present. **Not implemented and explicitly reported as
+`not_run` in `data/images/report.json`:** watermark/text-overlay detection,
+blur/contrast scoring, NSFW/violence classifier, identifiable-person detection,
+CLIP relevance scoring, pHash near-duplicate removal. These need vision models;
+pretending otherwise would ship unverified pictures.
+
+**Matching — the honest result.** Four high-confidence tiers were specified
+(QID → Wikipedia langlinks → WordNet/CLIP). Only one is built: *Wikipedia
+article lead image* (`pageimages` + Commons `extmetadata`), with the article
+title required to equal the term. A looser Commons file-title search exists
+behind `--allow-commons` but is off by default, because measurement showed it
+produces nonsense at dictionary scale: with title search on, `干巴巴 / dry`
+matched a village sign and `中辣 / hot` matched a hot-air balloon. Requiring an
+exact article title raises precision and cuts yield — which is the correct
+trade: no image is better than a wrong image for a learner.
+
+**Yield observed (60-word probe, `--limit 60`, exact-title mode):** 5 entries got
+an approved image (≈8%) because the probe starts from the shortest glosses,
+which are mostly abstract (`two`, `dry`, `ace`). Concrete-noun categories must be
+walked separately (`--category nature`, `--category everyday`) for usable
+coverage. Every accepted row stores `match_method` + `confidence` (0.85 for the
+article tier) so a wrong picture is identifiable later.
+
+**Storage:** 800 px detail + 256 px thumb, both requested from the source's own
+thumbnailer (no local resizing, no Pillow dependency), named by sha1 of
+(source URL + word), written under `backend/data/images/<2 hex>/`. Never bundled
+in the app: the app gets URLs. Measured: 5 images ≈ 3.5 MB, i.e. ~0.7 MB/entry
+at both sizes — 5 M images at these sizes is ≈500 GB at the 800 px tier and
+≈100 GB for thumbs alone, matching the budget in the plan. This is why the CDN
+step (R2/B2/Supabase) and the slim 200k-row image index for the app are still
+open items, not done.
+
+**Schema (created by the pipeline, SQLite side only):** `images`, `entry_images`,
+`best_image_per_entry` view, indexes on `(entry_id, rank)` and `content_hash`.
+Postgres-side schema, `review_queue`, `missing_image_requests`, migration
+versioning and VACUUM reporting are **not built**.
+
+**Serving:** `GET /api/v1/images?entry_id=` returns best image + attribution +
+licence + up to 5 ranked items, and a `category` icon key when the entry has no
+picture (no error). Verified live: `zh4360` → thumb 80,308 bytes, licence
+`CC BY-SA 3.0`, attribution
+`Modern_bra_fullcup.jpg — Steifer with help of Gytha — CC BY-SA 3.0 via Wikimedia Commons`; unknown entry returns `items: []` + `icon` rather than a 404.
+Batch endpoint accepts ≤50 ids. Redis caching and CDN cache headers are open.
+
+**Client behaviour:** image loads after the meaning, never before it; shimmer
+while decoding, fade-in on first frame, tap-to-open viewer with `InteractiveViewer`
+zoom, attribution + licence + confidence line under the image, and a per-category
+material icon when there is none. The 300 MB LRU disk cache, prefetch of the first
+10 results, and the offline image index are **not** implemented — Flutter's default
+in-memory image cache is what runs today.

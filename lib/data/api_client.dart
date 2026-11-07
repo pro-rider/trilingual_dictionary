@@ -7,6 +7,7 @@ import '../core/normalizer.dart';
 import '../core/supabase_config.dart';
 import 'models/analyzed_text.dart';
 import 'models/dictionary_entry.dart';
+import 'models/word_image.dart';
 
 /// Thin client for the FastAPI backend. Failures return null so the offline
 /// dictionary always takes over instead of throwing on the user.
@@ -66,6 +67,23 @@ class ApiClient {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Approved images for one entry. Returns null when offline / no backend.
+  Future<WordImages?> images(String entryId) async {
+    try {
+      final resp = await _dio.get(
+        '/api/v1/images',
+        queryParameters: {'entry_id': entryId},
+      );
+      final data = resp.data;
+      if (data == null) return null;
+      return WordImages.fromJson(data as Map<String, dynamic>);
+    } on DioException {
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 

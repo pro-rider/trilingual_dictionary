@@ -53,3 +53,5 @@ app.*.map.json
 /backend/data/raw/
 /backend/data/build/
 
+
+/backend/data/images/

@@ -334,3 +334,56 @@ and a session exists (interceptor). Dio timeouts: 25 s connect + receive.
 3. Update this document + the example payload.
 4. Add a test asserting the new field (backend) and a decode test (Dart).
 5. Ship backend first (old clients ignore unknown keys), then the app.
+
+---
+
+## 12. Image endpoints (added for the image pipeline)
+
+### `GET /api/v1/images`
+
+| Param | Type | Rules |
+|---|---|---|
+| `entry_id` | string | `zh23847`, `23847` or a fixture id; required |
+| `limit` | int | 1–5, default 3 |
+
+`200` always — a word with no picture is not an error:
+
+```json
+{
+  "entry_id": "zh4360",
+  "items": [{
+    "image_id": 2,
+    "thumb_url": "http://…/static/images/8b/8b6c…_256.jpg",
+    "detail_url": "http://…/static/images/8b/8b6c…_800.jpg",
+    "width": 1600, "height": 1200,
+    "attribution": "Modern_bra_fullcup.jpg — Steifer with help of Gytha — CC BY-SA 3.0 via Wikimedia Commons",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:…",
+    "confidence": 0.85,
+    "match_method": "wikipedia-lead-image"
+  }],
+  "icon": "everyday"
+}
+```
+
+- `items: []` + `icon` is the "no image" contract. `icon` is an entry category
+  key (`nature`, `transport`, `everyday`, `idiom`, `proper_noun`, `general`, …);
+  the client maps it to a Material icon.
+- Only `status = 'approved'` images are returned; rejected/removed rows stay in
+  the database for audit but never reach the client.
+- `attribution` is stored per image and must be rendered verbatim — CC BY and
+  CC BY-SA require author + licence + source.
+- Files are served by `/static/images/**` from `backend/data/images`; the mount
+  only exists when the pipeline has produced files, so a fresh checkout still boots.
+- `image_base_url` (settings) overrides the host used to build URLs when the
+  backend sits behind a proxy or a CDN.
+
+### `GET /api/v1/images/batch`
+
+`entry_ids` = comma-separated, **max 50**, `limit` per entry 1–5 (default 2).
+Returns a list of the same objects in the requested order, for search-result
+thumbnails. Same no-image contract per entry.
+
+Redis caching and CDN cache headers are specified but **not implemented**; each
+call currently runs one indexed SQLite read.

@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -16,6 +19,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Dictionary images are files on disk (never bundled in the app). Mounted
+    # only when the pipeline has produced something, so a fresh checkout runs.
+    images_dir = Path(settings.images_dir)
+    if images_dir.is_dir():
+        app.mount(
+            "/static/images", StaticFiles(directory=str(images_dir)), name="images"
+        )
 
     app.include_router(api_router, prefix="/api/v1")
 

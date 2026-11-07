@@ -387,3 +387,50 @@ thumbnails. Same no-image contract per entry.
 
 Redis caching and CDN cache headers are specified but **not implemented**; each
 call currently runs one indexed SQLite read.
+
+---
+
+## 13. AI fallback fields on `POST /api/v1/search`
+
+Lookup order is fixed: curated fixture → merged SQLite dictionary → **AI** → `null`.
+
+When AI answers, `entry` carries provenance so the client cannot mistake it for
+dictionary data:
+
+```json
+{
+  "entry_id": "ai-flibbertigibbet",
+  "word_en": "flibbertigibbet",
+  "word_zh": "轻浮者",
+  "source": "ai",
+  "unverified": true,
+  "cached": false,
+  "senses": [{
+    "pinyin": "qīngfúzhě",
+    "meaning_en": "a frivolous, flighty person",
+    "meaning_zh": "轻浮、善变的人",
+    "meaning_ne": "चञ्चल स्वभावको व्यक्ति",
+    "meaning_ne_status": "ai_generated",
+    "examples": [{ "en": "…", "zh": "…", "ne": "…", "source": "ai",
+                   "review_status": "ai_generated" }]
+  }]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `source` | `dictionary` (fixture or SQLite) or `ai` |
+| `unverified` | `true` only for AI output — the app shows an amber banner |
+| `cached` | `true` when served from `ai_cache` instead of a fresh model call |
+| `meaning_ne_status` | `ai_generated` for AI, `published` for fixture, `pending` for SQLite rows |
+
+`ai_cache` (in `dictionary.sqlite`): `query, lang, payload, provider, status,
+created_at, hits`, primary key `(query, lang)`. Every successful generation is
+written there, so the same word is never billed twice and a cached answer still
+works while the provider is down. Measured on this machine: cold AI ≈ 2.9 s,
+cache hit ≈ 83 ms.
+
+Failure behaviour: AI disabled (`AI_ENABLED=false` / no key) or every provider
+failing → `entry: null`. The app then shows "No entry found" with a different
+message depending on whether the server is reachable, plus a retry button —
+it never claims a word is unknown when the lookup simply could not run.

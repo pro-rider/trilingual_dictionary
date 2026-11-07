@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/normalizer.dart';
 import '../../core/tts_service.dart';
+import '../../data/api_client.dart';
 import '../../data/models/dictionary_entry.dart';
 import '../../data/models/sense.dart';
 import '../favorites/favorites_repository.dart';
@@ -146,6 +147,10 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           ],
         ),
         const SizedBox(height: 6),
+        if (entry.isAiGenerated) ...[
+          _aiBanner(entry.cached),
+          const SizedBox(height: 8),
+        ],
         SenseSelector(
           senses: senses,
           selectedIndex: _senseIndex,
@@ -161,26 +166,76 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     );
   }
 
+  /// Honest label for an online AI answer: this word is not in the dictionary,
+  /// so the meaning is machine-generated and must not read as verified data.
+  Widget _aiBanner(bool cached) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, size: 18, color: Color(0xFFD97706)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'AI-generated · unverified'
+              '${cached ? ' · cached' : ''}\n'
+              'This word is not in the dictionary yet. The meaning and example '
+              'come from an AI model — check them before relying on them.',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _empty() {
+    final reachable = ref.watch(backendReachableProvider);
+    final args = SearchArgs(widget.query, widget.lang);
+    final online = reachable.valueOrNull;
+    final message = online == null
+        ? 'Checking whether the server is reachable…'
+        : online
+            ? '“${widget.query}” is not in the dictionary and the AI could not '
+                'answer right now (provider error or limit). Try again in a moment.'
+            : 'You are offline, so only the small bundled dictionary '
+                '(6 words) can answer. The full dictionary and the AI lookup '
+                'both need a connection.';
+    final buttonLabel = online == true ? 'Try again' : 'Reconnect and retry';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off, size: 56, color: Color(0xFF94A3B8)),
+            Icon(online == false ? Icons.wifi_off : Icons.search_off,
+                size: 56, color: const Color(0xFF94A3B8)),
             const SizedBox(height: 12),
             const Text('No entry found',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              '“${widget.query}” is not in the offline dataset yet.\n'
-              'It will be added in a future data update.',
+              message,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
+              onPressed: () {
+                ref.invalidate(backendReachableProvider);
+                ref.invalidate(resultProvider(args));
+              },
+              icon: const Icon(Icons.refresh),
+              label: Text(buttonLabel),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
               onPressed: () => context.go('/home'),
               icon: const Icon(Icons.arrow_back),
               label: const Text('Back to search'),

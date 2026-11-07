@@ -12,7 +12,7 @@ flutter test                    # 13 tests, < 2 s
 
 # Backend
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
-.venv\Scripts\python.exe -m pytest -q     # 35 tests, ~1–2 s
+.venv\Scripts\python.exe -m pytest -q     # 39 tests, ~1.5 s
 ```
 
 `flutter` commands require git on `PATH` (`Unable to find git in your PATH`
@@ -31,6 +31,7 @@ otherwise). No test needs the network, an API key, or Postgres.
 | Health, search, sentence, popular, suggest | — | ✅ `test_api.py` (9) | no prefix/edge-case length tests |
 | Auth (503/401/valid) | — | ✅ `test_auth.py` (3) | no favorites/feedback success path (needs DB) |
 | Fallback sentence | — | ✅ in `test_api.py` | template wording not asserted |
+| AI fallback (unknown word → AI, provenance flags, cache reuse, cache survives provider outage) | — | ✅ `test_ai_fallback.py` (4), stubbed — no network | real provider latency not asserted |
 | Quality gate + romanisation | — | ✅ `test_quality.py` (3) | 0.5 placeholder is untested by design |
 | Text analysis (zh/en, stopwords, degrade, AI shapes, span merge) | — | ✅ `test_text_analysis.py` (12) | no adversarial Unicode |
 | Failover (retry/429/circuit/all-down/metrics) | — | ✅ `test_failover.py` (8) | no real-provider contract test |
@@ -40,7 +41,7 @@ otherwise). No test needs the network, an API key, or Postgres.
 | DB models / migrations | — | ❌ none | needs a Postgres fixture |
 | Performance | ❌ | ❌ | manual measurements only |
 
-Totals: **13 Dart tests, 35 Python tests**, all green on 2026‑11‑07.
+Totals: **13 Dart tests, 39 Python tests**, all green on 2026‑11‑08.
 
 ---
 

@@ -1,6 +1,6 @@
 from app.schemas.search import EntryOut, ExampleSentenceOut, SenseOut
 from app.services.dataset import find_entry, load_entries
-from app.services import sqlite_dataset
+from app.services import ai_cache, sqlite_dataset
 from app.ai.provider import generate_draft
 
 
@@ -33,14 +33,21 @@ def dictionary_search_with_ai(query: str, lang: str) -> EntryOut | None:
 
 
 def _entry_from_ai(query: str, lang: str) -> EntryOut | None:
-    draft = generate_draft(query, lang)
-    if not draft:
-        return None
-    word_en = draft["word_en"]
-    word_zh = draft["word_zh"]
+    """AI path: cache → provider → cache. Never bills the same word twice."""
+    cached = ai_cache.get(query, lang)
+    hit = bool(cached)
+    if not cached:
+        draft = generate_draft(query, lang)
+        if not draft or not draft.get("meaning_en"):
+            return None
+        ai_cache.put(query, lang, draft)
+        cached = draft
+    draft = cached
+    word_en = draft.get("word_en") or query
+    word_zh = draft.get("word_zh", "")
     entry_id = f"ai-{word_en or query}"
     example = None
-    if draft["example_en"] and draft["example_zh"] and draft["example_ne"]:
+    if draft.get("example_en") and draft.get("example_zh") and draft.get("example_ne"):
         example = ExampleSentenceOut(
             en=draft["example_en"],
             zh=draft["example_zh"],
@@ -52,17 +59,24 @@ def _entry_from_ai(query: str, lang: str) -> EntryOut | None:
         sense_id=f"{entry_id}-1",
         word_en=word_en,
         word_zh=word_zh,
-        pinyin=draft["pinyin"],
+        pinyin=draft.get("pinyin", ""),
         ipa_en="",
-        part_of_speech=draft["part_of_speech"],
-        meaning_en=draft["meaning_en"],
-        meaning_zh=draft["meaning_zh"],
-        meaning_ne=draft["meaning_ne"],
+        part_of_speech=draft.get("part_of_speech", ""),
+        meaning_en=draft.get("meaning_en", ""),
+        meaning_zh=draft.get("meaning_zh", ""),
+        meaning_ne=draft.get("meaning_ne", ""),
         meaning_ne_status="ai_generated",
         examples=[example] if example else [],
     )
-    return EntryOut(entry_id=entry_id, word_en=word_en, word_zh=word_zh,
-                    senses=[sense])
+    return EntryOut(
+        entry_id=entry_id,
+        word_en=word_en,
+        word_zh=word_zh,
+        senses=[sense],
+        source="ai",
+        unverified=True,
+        cached=hit,
+    )
 
 
 def popular_words(limit: int = 6) -> list[str]:

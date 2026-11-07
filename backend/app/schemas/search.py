@@ -30,6 +30,12 @@ class EntryOut(BaseModel):
     word_en: str
     word_zh: str
     senses: list[SenseOut] = Field(default_factory=list)
+    # Provenance: "dictionary" (curated fixture or merged SQLite) or "ai"
+    # (generated on the fly because nothing matched). The client must label
+    # `source == "ai"` results as unverified rather than as dictionary facts.
+    source: str = "dictionary"
+    unverified: bool = False
+    cached: bool = False
 
 
 class SearchRequest(BaseModel):

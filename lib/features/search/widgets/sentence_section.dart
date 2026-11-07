@@ -7,7 +7,10 @@ import 'trilingual_block.dart';
 class SentenceSection extends StatelessWidget {
   final ExampleSentence example;
 
-  const SentenceSection({super.key, required this.example});
+  /// Ask for one more enrichment pass when a language row is still empty.
+  final VoidCallback? onRetryEmpty;
+
+  const SentenceSection({super.key, required this.example, this.onRetryEmpty});
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +52,7 @@ class SentenceSection extends StatelessWidget {
             zh: example.zh,
             ne: example.ne,
             highlightNepali: true,
+            onRetryEmpty: onRetryEmpty,
           ),
         ],
       ),

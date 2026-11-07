@@ -113,6 +113,7 @@ class ApiClient {
       for (final raw in list) {
         final map = raw as Map<String, dynamic>;
         out[map['key'] as String] = {
+          'zh': map['zh'] as String? ?? '',
           'ne': map['ne'] as String? ?? '',
           'example_en': map['example_en'] as String? ?? '',
           'example_zh': map['example_zh'] as String? ?? '',

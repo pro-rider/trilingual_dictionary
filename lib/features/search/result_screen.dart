@@ -50,8 +50,20 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     }
   }
 
-  Future<void> _copy(Sense sense) async {
-    final buffer = StringBuffer()
+  /// Re-run the lookup so the repository gets another chance to fill the empty
+  /// 中文 / नेपाली boxes from the backend, then refresh the screen.
+  void _retryEnrich() {
+    final args = SearchArgs(widget.query, widget.lang);
+    ref.invalidate(backendReachableProvider);
+    ref.invalidate(resultProvider(args));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reaching the server for the missing languages…')),
+      );
+    }
+  }
+
+  Future<void> _copy(Sense sense) async {    final buffer = StringBuffer()
       ..writeln(sense.wordEn)
       ..writeln('${sense.wordZh}  ${sense.pinyin}'.trim());
     if (sense.meaningEn.isNotEmpty) buffer.writeln('EN: ${sense.meaningEn}');
@@ -157,7 +169,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           onSelect: (i) => setState(() => _senseIndex = i),
         ),
         const SizedBox(height: 4),
-        ResultCard(sense: sense),
+        ResultCard(sense: sense, onRetryEmpty: _retryEnrich),
         const SizedBox(height: 14),
         // Picture for this entry, loaded separately so the meaning never waits
         // on the network (stage 44 of the image plan).

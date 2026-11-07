@@ -435,12 +435,13 @@ failing → `entry: null`. The app then shows "No entry found" with a different
 message depending on whether the server is reachable, plus a retry button —
 it never claims a word is unknown when the lookup simply could not run.
 
-## 14. `POST /api/v1/dictionary/enrich` (on-demand Nepali + example)
+## 14. `POST /api/v1/dictionary/enrich` (on-demand 中文 + Nepali + example)
 
-CC-CEDICT has no Nepali and no example sentences. Rather than paying for all
-195k senses up front (measured 0.4 senses/s on free-tier keys — about five
-days), the app asks for exactly the senses a learner opens and stores the
-answer in its own on-device SQLite file.
+CC-CEDICT ships English glosses only: no Chinese definition, no Nepali, no
+example sentence. Rather than paying for all 195k senses up front (measured
+0.4–0.5 senses/s on free-tier keys — about five days), the app asks for exactly
+the senses a learner opens and stores the answer in its own on-device SQLite
+file.
 
 Request:
 
@@ -453,7 +454,8 @@ Request:
 Response (200):
 
 ```json
-{"items": [{"key": "s12345", "ne": "हिमालयको देश",
+{"items": [{"key": "s12345", "zh": "喜马拉雅山南麓的国家",
+  "ne": "हिमालयको देश",
   "example_en": "She plans to travel to Nepal next summer…",
   "example_zh": "她计划明年夏天去尼泊尔旅行……",
   "example_ne": "उनी अर्को गर्मीमा नेपाल यात्रा गर्ने योजना…"}],
@@ -461,14 +463,14 @@ Response (200):
 ```
 
 Missing keys mean "the model did not answer" — the client keeps the old value
-and retries on the next lookup. The endpoint never invents a translation
+and retries on the next lookup. The endpoint never invents a translation.
 
 Client behaviour (`lib/data/local/offline_dictionary.dart` `enrich()`):
-1. after an offline hit, collect senses whose `gloss_ne` is empty or that have
-   no `examples` row;
+1. after an offline hit, collect senses whose `gloss_zh` or `gloss_ne` is empty,
+   or that have no `examples` row;
 2. call this endpoint **only when the backend is reachable** (a cached
    `backendReachableProvider` read — searching with no network must not wait
    for a 25 s timeout);
-3. `UPDATE senses SET gloss_ne=…, ne_status='ai_translated'` and
-   `INSERT INTO examples`;
+3. `UPDATE senses SET gloss_zh=…`, `UPDATE senses SET gloss_ne=…,
+   ne_status='ai_translated'` and `INSERT INTO examples`;
 4. re-render the entry from the database, so the write is visible immediately.

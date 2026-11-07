@@ -27,6 +27,7 @@ def enrich(req: EnrichRequest):
         items=[
             EnrichItemOut(
                 key=item.key,
+                zh=payload.get(item.key, {}).get("zh", ""),
                 ne=payload.get(item.key, {}).get("ne", ""),
                 example_en=payload.get(item.key, {}).get("example_en", ""),
                 example_zh=payload.get(item.key, {}).get("example_zh", ""),

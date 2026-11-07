@@ -10,7 +10,11 @@ class ResultCard extends StatelessWidget {
   final Sense sense;
   final VoidCallback? onOpen;
 
-  const ResultCard({super.key, required this.sense, this.onOpen});
+  /// Ask for one more enrichment pass when a language row is still empty.
+  final VoidCallback? onRetryEmpty;
+
+  const ResultCard(
+      {super.key, required this.sense, this.onOpen, this.onRetryEmpty});
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +42,11 @@ class ResultCard extends StatelessWidget {
                 ne: sense.meaningNe,
                 pinyin: sense.pinyin,
                 highlightNepali: true,
+                onRetryEmpty: onRetryEmpty,
               ),
               if (example != null) ...[
                 const SizedBox(height: 12),
-                SentenceSection(example: example),
+                SentenceSection(example: example, onRetryEmpty: onRetryEmpty),
               ],
             ],
           ),

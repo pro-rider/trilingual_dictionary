@@ -23,6 +23,16 @@ class TtsService {
         SpeechLang.nepali => 'ne-NP',
       };
 
+  /// Nepali voice packs are rare. Devanagari is also read correctly by a Hindi
+  /// voice, so the fallback chain is: Nepali → Hindi → English. This matters on
+  /// Android, where `setLanguage('ne-NP')` throws when no pack is installed and
+  /// the old code then silently read Devanagari with an English voice.
+  static const Map<SpeechLang, List<String>> _fallbackChain = {
+    SpeechLang.english: ['en-US', 'en-GB'],
+    SpeechLang.chinese: ['zh-CN', 'zh-TW'],
+    SpeechLang.nepali: ['ne-NP', 'ne', 'hi-IN'],
+  };
+
   Future<void> _configure() async {
     if (_configured) return;
     try {
@@ -42,18 +52,27 @@ class TtsService {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     await _configure();
+    // One utterance at a time: starting a new one must cut the previous.
     try {
       await _tts.stop();
-      await _tts.setLanguage(languageCode(lang));
+    } catch (_) {
+      // ignore — stop() is not implemented by every engine
+    }
+    for (final code in _fallbackChain[lang] ?? const ['en-US']) {
+      try {
+        final ok = await _tts.setLanguage(code);
+        if (ok == 0 && code != 'en-US') continue; // 0 = not available
+        await _tts.speak(trimmed);
+        return;
+      } catch (_) {
+        // Voice pack missing for this code; try the next one.
+      }
+    }
+    // Last resort: the engine's default voice. Better than silence.
+    try {
       await _tts.speak(trimmed);
     } catch (_) {
-      // Voice pack for that language is missing — fall back, never throw.
-      try {
-        await _tts.setLanguage(languageCode(SpeechLang.english));
-        await _tts.speak(trimmed);
-      } catch (_) {
-        // Engine unavailable entirely (e.g. headless CI) — ignore.
-      }
+      // Engine unavailable entirely (e.g. headless CI) — ignore.
     }
   }
 

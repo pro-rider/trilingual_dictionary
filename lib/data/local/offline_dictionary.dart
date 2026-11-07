@@ -403,7 +403,8 @@ class OfflineDictionary {
     for (final row in rows) {
       final sid = row['sense_id'] as int;
       final ne = ((row['gloss_ne'] as String?) ?? '').trim();
-      final needs = ne.isEmpty || !withExample.contains(sid);
+      final zh = ((row['gloss_zh'] as String?) ?? '').trim();
+      final needs = ne.isEmpty || zh.isEmpty || !withExample.contains(sid);
       if (!needs) continue;
       items.add(MapEntry('s$sid',
           '${entry.wordZh}\u0001${(row['gloss_en'] as String?) ?? ''}'));
@@ -420,6 +421,11 @@ class OfflineDictionary {
       final ne = (data['ne'] ?? '').trim();
       if (ne.isNotEmpty) {
         await db.update('senses', {'gloss_ne': ne, 'ne_status': 'ai_translated'},
+            where: 'sense_id = ?', whereArgs: [sid]);
+      }
+      final zh = (data['zh'] ?? '').trim();
+      if (zh.isNotEmpty) {
+        await db.update('senses', {'gloss_zh': zh},
             where: 'sense_id = ?', whereArgs: [sid]);
       }
       final exampleEn = (data['example_en'] ?? '').trim();

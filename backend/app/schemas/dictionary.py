@@ -26,6 +26,7 @@ class EnrichRequest(BaseModel):
 
 class EnrichItemOut(BaseModel):
     key: str
+    zh: str = ""
     ne: str = ""
     example_en: str = ""
     example_zh: str = ""

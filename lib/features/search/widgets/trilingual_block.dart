@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/tts_service.dart';
 
 /// The reusable 3-language display widget.
 /// English = sky, 中文 = rose, नेपाली = amber (v2 spec).
@@ -8,12 +10,19 @@ import '../../../core/constants.dart';
 /// Pinyin is rendered as a small, clearly-separated pronunciation badge on the
 /// 中文 label line — never blended into the meaning text. (Fixed per user:
 /// "pinyin was showing inside the word meaning".)
-class TrilingualBlock extends StatelessWidget {
+///
+/// Every language row carries its own speaker button: the user marks the 中文
+/// and नेपाली rows as the ones they want read aloud, not just the headword.
+class TrilingualBlock extends ConsumerWidget {
   final String en;
   final String zh;
   final String ne;
   final String? pinyin;
   final bool highlightNepali;
+
+  /// Called when a language row has no text yet, so the screen can ask the
+  /// backend for one more enrichment pass instead of showing a dead box.
+  final VoidCallback? onRetryEmpty;
 
   const TrilingualBlock({
     super.key,
@@ -22,27 +31,33 @@ class TrilingualBlock extends StatelessWidget {
     required this.ne,
     this.pinyin,
     this.highlightNepali = false,
+    this.onRetryEmpty,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _row(context, LanguageColors.en, 'English', en),
+        _row(context, ref, LanguageColors.en, 'English', en,
+            SpeechLang.english),
         _row(
           context,
+          ref,
           LanguageColors.zh,
           '中文',
           zh,
+          SpeechLang.chinese,
           pinyin: pinyin,
           soft: LanguageColors.zhSoft,
         ),
         _row(
           context,
+          ref,
           LanguageColors.ne,
           'नेपाली',
           ne,
+          SpeechLang.nepali,
           soft: LanguageColors.neSoft,
           emphasized: highlightNepali,
         ),
@@ -52,15 +67,20 @@ class TrilingualBlock extends StatelessWidget {
 
   Widget _row(
     BuildContext context,
+    WidgetRef ref,
     Color color,
     String label,
-    String text, {
+    String text,
+    SpeechLang lang, {
     String? pinyin,
     Color? soft,
     bool emphasized = false,
   }) {
     final scheme = Theme.of(context).colorScheme;
     final hasPinyin = pinyin != null && pinyin.trim().isNotEmpty;
+    final body = text.trim();
+    final hasBody = body.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -117,19 +137,67 @@ class TrilingualBlock extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: emphasized ? 15.5 : 14.5,
-                    fontWeight: emphasized ? FontWeight.w600 : FontWeight.w500,
-                    color: scheme.onSurface,
-                    height: 1.35,
-                  ),
-                ),
+                if (hasBody)
+                  Text(
+                    body,
+                    style: TextStyle(
+                      fontSize: emphasized ? 15.5 : 14.5,
+                      fontWeight:
+                          emphasized ? FontWeight.w600 : FontWeight.w500,
+                      color: scheme.onSurface,
+                      height: 1.35,
+                    ),
+                  )
+                else
+                  _missingBody(context, color),
               ],
             ),
           ),
+          if (hasBody)
+            IconButton(
+              tooltip: 'Pronounce $label',
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.only(left: 6),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: () => ref
+                  .read(ttsServiceProvider)
+                  .speak(body, lang: lang),
+              icon: Icon(Icons.volume_up, size: 18, color: color),
+            ),
         ],
+      ),
+    );
+  }
+
+  /// Empty row: say so plainly and offer the one action that can fix it, rather
+  /// than leaving a blank coloured box that looks like a rendering bug.
+  Widget _missingBody(BuildContext context, Color color) {
+    if (onRetryEmpty == null) {
+      return Text(
+        '—',
+        style: TextStyle(fontSize: 14, color: color.withValues(alpha: 0.6)),
+      );
+    }
+    return InkWell(
+      onTap: onRetryEmpty,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.translate, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(
+              'Translate now',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -292,14 +292,16 @@ def enrich_senses_batch(
         "You are a trilingual lexicographer writing a Chinese learners' "
         "dictionary (English / Simplified Chinese / Nepali). Each line is "
         "`key<TAB>chinese word<TAB>english gloss`. For each line produce:\n"
-        "1. ne: a SHORT Nepali gloss in Devanagari (2–6 words, dictionary "
+        "1. zh: a SHORT Chinese definition of that sense (4–14 汉字, dictionary "
+        "style, Simplified Chinese, no pinyin, never just repeat the headword).\n"
+        "2. ne: a SHORT Nepali gloss in Devanagari (2–6 words, dictionary "
         "style, never a transliteration, never English letters).\n"
-        "2. example_en: ONE natural sentence (8–16 words) that actually uses "
+        "3. example_en: ONE natural sentence (8–16 words) that actually uses "
         "the English gloss as a word, not as an explanation.\n"
-        "3. example_zh: that same sentence in natural Simplified Chinese.\n"
-        "4. example_ne: that same sentence in Nepali (Devanagari).\n"
+        "4. example_zh: that same sentence in natural Simplified Chinese.\n"
+        "5. example_ne: that same sentence in Nepali (Devanagari).\n"
         "Respond with STRICT JSON only:\n"
-        '{"items":[{"key":"<key>","ne":"<nepali>",'
+        '{"items":[{"key":"<key>","zh":"<definition>","ne":"<nepali>",'
         '"example_en":"<sentence>","example_zh":"<sentence>",'
         '"example_ne":"<sentence>"}]}\n'
         "Every key must appear exactly once. No prose.\n\n" + lines
@@ -317,6 +319,7 @@ def enrich_senses_batch(
         if not key:
             continue
         out[key] = {
+            "zh": str(item.get("zh") or "").strip(),
             "ne": str(item.get("ne") or "").strip(),
             "example_en": str(item.get("example_en") or "").strip(),
             "example_zh": str(item.get("example_zh") or "").strip(),

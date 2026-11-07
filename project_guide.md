@@ -219,7 +219,7 @@ lib/
 │   ├── constants.dart            app-wide constants
 │   ├── normalizer.dart           language detection (en/zh), pinyin key, search routing
 │   ├── supabase_config.dart      anon key + schema notes for auth/favorites
-│   ├── tts_service.dart          flutter_tts wrapper (en/zh voices, fallback to en)
+│   ├── tts_service.dart          flutter_tts wrapper (en / zh / ne, fallback ne→hi→en)
 │   └── errors/failures.dart      typed failures
 ├── data/
 │   ├── api_client.dart           Dio client: search, suggest, sentence, analyze,
@@ -262,6 +262,7 @@ lib/
 | Search behaviour, backend-vs-asset order | `lib/features/search/search_provider.dart` |
 | What words exist offline / how a lookup matches | `lib/data/local/offline_dictionary.dart` |
 | Result page layout, copy, TTS button | `lib/features/search/result_screen.dart` |
+| Per-language speaker buttons (EN / 中文 / नेपाली + sentences) | `lib/features/search/widgets/trilingual_block.dart` |
 | Image card look (shimmer, zoom, attribution) | `lib/features/search/widgets/word_image_card.dart` |
 | API host / timeout | `lib/core/api_config.dart` |
 | English/Chinese auto-detection or routing rule | `lib/core/normalizer.dart` |

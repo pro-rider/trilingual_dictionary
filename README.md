@@ -6,6 +6,23 @@ read meanings + aligned example sentences in **English · 中文 · नेपा
 Full architecture, run commands, verification results and known gaps:
 **[project_guide.md](project_guide.md)**.
 
+## Project documents
+
+| Document | Subject |
+|---|---|
+| [AGENTS.md](AGENTS.md) | rules for AI coding assistants (and for humans using them) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | layers, state, routing, search & analysis pipelines |
+| [ENV-CONTRACTS.md](ENV-CONTRACTS.md) | every env var, default, sensitivity, runtime mode |
+| [API-CONTRACTS.md](API-CONTRACTS.md) | HTTP endpoints + internal repository/provider contracts |
+| [MODEL-CONTRACTS.md](MODEL-CONTRACTS.md) | NLP/AI behaviour (rule-based + remote LLM, no local models) |
+| [DATA-GOVERNANCE.md](DATA-GOVERNANCE.md) | dataset schema, provenance, validation, update flow |
+| [IMPACT-MAP.md](IMPACT-MAP.md) | what breaks when a component changes |
+| [CHANGE-SCOPE.md](CHANGE-SCOPE.md) | allowed modification boundaries and approval gates |
+| [TESTING.md](TESTING.md) | test strategy, commands, gaps |
+| [PERFORMANCE-BUDGET.md](PERFORMANCE-BUDGET.md) | measured numbers and latency/memory budgets |
+| [SECURITY.md](SECURITY.md) | secrets, transport, auth, storage, publishing |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | environment, workflow, conventions, PR rules |
+
 ## Quick start
 
 ```powershell

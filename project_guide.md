@@ -53,7 +53,7 @@ Android emulator is the emulator itself, hence the `10.0.2.2` override.
 
 ```powershell
 cd backend; .venv\Scripts\python.exe -m pytest -q      # 35 passed
-cd ..\trilingual_dictionary; flutter analyze; flutter test # 0 issues, 13 passed
+cd ..\trilingual_dictionary; flutter analyze; flutter test # 0 issues, 16 passed
 ```
 
 ---
@@ -174,7 +174,7 @@ the FastAPI backend live in the same repo; `backend/` is not a submodule.
 ```
 trilingual_dictionary/
 ├── lib/                 Flutter app source (all Dart code)
-├── test/                Flutter tests (4 files)
+├── test/                Flutter tests (5 files)
 ├── assets/data/         Data bundled INTO the app
 │   └── en_zh_ne.json    6 curated entries, the only offline dictionary today
 ├── backend/             FastAPI service + data tools (separate Python venv)
@@ -209,7 +209,9 @@ lib/
 │   ├── api_client.dart           Dio client: search, suggest, sentence, analyze,
 │   │                             images, health. Returns null on failure (never throws)
 │   ├── providers.dart            Riverpod providers shared across features
-│   ├── dictionary_repository.dart  in-memory + asset dataset, findById for /detail
+│   ├── dictionary_repository.dart  curated JSON snapshot → bundled SQLite database
+│   ├── local/offline_dictionary.dart  unpacks assets/data/dictionary.sqlite.gz once,
+│   │                             then SQL search over 123,672 entries (read-only)
 │   ├── auth_provider.dart        Supabase session state
 │   └── models/                   dictionary_entry, sense, example_sentence,
 │                                 analyzed_text, auth_state, signed_in_user, word_image
@@ -239,6 +241,7 @@ lib/
 |---|---|
 | Add/rename a screen or route | `lib/app/router.dart` + a new folder under `lib/features/` |
 | Search behaviour, backend-vs-asset order | `lib/features/search/search_provider.dart` |
+| What words exist offline / how a lookup matches | `lib/data/local/offline_dictionary.dart` |
 | Result page layout, copy, TTS button | `lib/features/search/result_screen.dart` |
 | Image card look (shimmer, zoom, attribution) | `lib/features/search/widgets/word_image_card.dart` |
 | API host / timeout | `lib/core/api_config.dart` |
@@ -246,7 +249,7 @@ lib/
 | Backend URL paths | `lib/data/api_client.dart` (must match `backend/app/api/v1/`) |
 | Pronunciation behaviour | `lib/core/tts_service.dart` |
 | Colors / typography | `lib/app/theme/app_theme.dart` |
-| Offline dictionary size | `assets/data/en_zh_ne.json` (bundled) — see §5 |
+| Offline dictionary size | `assets/data/en_zh_ne.json` (6 curated entries) + `assets/data/dictionary.sqlite.gz` (42.5 MB, rebuild via §8.7) |
 
 ### 7.3 Backend — `backend/`
 
@@ -455,7 +458,34 @@ rejected instead of becoming bogus entries. Measured on `H51007.pdf`: 762 tokens
 634 hits, 128 missing, **76 new entries**, 43 fragments rejected, 346 Nepali
 glosses, 86.7 s. Report: `exam_h51007.report.json`.
 
-### 8.7 Quality gate before any push
+### 8.7 Bundle the offline dictionary into the APK
+
+The whole database ships inside the app, so search works with the phone
+airplane-mode'd. The asset is **not** committed (42.5 MB binary, and every
+rebuild would add another blob) — regenerate it locally before building:
+
+```powershell
+cd ...\backend\data\build
+.venv\Scripts\python.exe -c "import gzip,shutil; i=open('dictionary.sqlite','rb'); o=gzip.open('dictionary.sqlite.gz','wb',compresslevel=9); shutil.copyfileobj(i,o); o.close(); i.close()"
+Copy-Item dictionary.sqlite.gz ...\trilingual_dictionary\assets\data\dictionary.sqlite.gz -Force
+
+cd ...\trilingual_dictionary
+flutter build apk --debug
+adb reverse tcp:8000 tcp:8000
+adb install -r build\app\outputs\flutter-apk\app-debug.apk
+```
+
+Measured: 96 MB → 42.5 MB in 31 s; APK 196 MB → 230.8 MB; first launch unpacks
+in the background (`lib\data\local\offline_dictionary.dart`, `gzip.decode` inside
+`Isolate.run`, written to `getApplicationSupportDirectory()/dictionary.sqlite`),
+later launches reopen the file read-only with no work.
+
+Search order on the phone: curated JSON snapshot (6 demo entries) →
+`OfflineDictionary` (exact / traditional / prefix for 中文; tone-less pinyin, then
+`match_score` over `gloss_en` for English) → backend API → AI. If the database
+was rebuilt, the asset **must** be regenerated, or the phone keeps the old words.
+
+### 8.8 Quality gate before any push
 
 ```powershell
 cd ...\backend;  .venv\Scripts\python.exe -m pytest -q
@@ -463,7 +493,7 @@ cd ...;          flutter analyze
                  flutter test
 ```
 
-### 8.8 Commit and push
+### 8.9 Commit and push
 
 ```powershell
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
@@ -476,7 +506,7 @@ git push origin main
 Do not commit `backend/data/*`, `.env`, `.venv/`. If a doc describes behaviour
 you changed, update that doc in the same commit (§7.5).
 
-### 8.9 Common failures
+### 8.10 Common failures
 
 | Symptom | Fix |
 |---|---|

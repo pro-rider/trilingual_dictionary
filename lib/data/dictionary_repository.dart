@@ -5,18 +5,28 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/errors/failures.dart';
 import '../core/normalizer.dart';
+import 'local/offline_dictionary.dart';
 import 'models/dictionary_entry.dart';
 
-/// Offline dictionary backed by the bundled JSON snapshot.
+/// Offline dictionary: the curated JSON snapshot first (6 demo entries with
+/// example sentences), then the bundled 123k-entry SQLite database.
 ///
 /// Matching order (v2 spec): exact → prefix → pinyin.
 /// Nepali is never a search input.
 class DictionaryRepository {
   final AssetBundle _bundle;
+  final OfflineDictionary? offline;
   List<DictionaryEntry> _entries = const [];
   bool _loaded = false;
 
-  DictionaryRepository(this._bundle);
+  DictionaryRepository(this._bundle, {this.offline});
+
+  /// Unpack the bundled database in the background so the first search is
+  /// instant. Failures are swallowed here — [search] surfaces them by
+  /// returning `null` and the API/AI path takes over.
+  Future<void> warmUp() async {
+    await offline?.installIfNeeded();
+  }
 
   Future<List<DictionaryEntry>> load() async {
     if (_loaded) return _entries;
@@ -36,8 +46,16 @@ class DictionaryRepository {
     }
   }
 
-  /// Search by English or 中文 input. Returns the first matching entry.
+  /// Search by English or 中文 input. Returns the first matching entry:
+  /// the curated snapshot first, then the full bundled database.
   Future<DictionaryEntry?> search(String query, InputLanguage lang) async {
+    final curated = await _searchSnapshot(query, lang);
+    if (curated != null) return curated;
+    return offline?.search(query, lang);
+  }
+
+  Future<DictionaryEntry?> _searchSnapshot(
+      String query, InputLanguage lang) async {
     await load();
     final q = Normalizer.normalize(query);
     if (q.isEmpty) return null;

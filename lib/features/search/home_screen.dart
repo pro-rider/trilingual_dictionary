@@ -213,13 +213,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 /// Live indicator: is the FastAPI backend reachable? (falls back to offline)
+/// Search itself always reads the on-device database first — the backend only
+/// adds AI drafts and images.
 class _BackendStatus extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(backendReachableProvider);
     final (Color, String) tuple = status.value == true
-        ? (const Color(0xFF16A34A), 'API online — search uses the backend')
-        : (const Color(0xFF94A3B8), 'Offline mode · backend not reachable');
+        ? (const Color(0xFF16A34A), 'Full dictionary on device · AI online')
+        : (const Color(0xFF94A3B8), 'Offline mode · full dictionary on device');
     return Row(
       children: [
         Icon(Icons.circle, size: 10, color: tuple.$1),

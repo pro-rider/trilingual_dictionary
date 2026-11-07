@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// One unit of the analyzed text, with its own trilingual meaning.
 class AnalyzedSegment {
   final String surface;
-  final String kind; // word | compound | phrase | idiom | punctuation | other
+  final String kind; // word | compound | phrase | idiom | punctuation | function | other
   final String wordEn;
   final String wordZh;
   final String pinyin;
@@ -11,7 +11,7 @@ class AnalyzedSegment {
   final String meaningEn;
   final String meaningZh;
   final String meaningNe;
-  final String source; // dataset | phrase | ai | unresolved
+  final String source; // dataset | phrase | ai | unresolved | stopword
   final String note;
 
   const AnalyzedSegment({
@@ -32,6 +32,8 @@ class AnalyzedSegment {
   bool get isIdiom => kind == 'idiom';
   bool get isPhrase => kind == 'phrase';
   bool get isCompound => kind == 'compound';
+  /// Grammatical glue ("the", "的") — kept in the text, not a dictionary entry.
+  bool get isFunction => kind == 'function';
   bool get isUnresolved => source == 'unresolved';
   bool get hasMeaning =>
       meaningEn.isNotEmpty || meaningZh.isNotEmpty || meaningNe.isNotEmpty;
@@ -95,7 +97,8 @@ class AnalyzedText {
       segments.where((s) => s.isIdiom || s.isPhrase).toList();
 
   List<AnalyzedSegment> get words => segments
-      .where((s) => !s.isPunctuation && !s.isIdiom && !s.isPhrase)
+      .where((s) =>
+          !s.isPunctuation && !s.isIdiom && !s.isPhrase && !s.isFunction)
       .toList();
 
   factory AnalyzedText.fromJson(Map<String, dynamic> json) {

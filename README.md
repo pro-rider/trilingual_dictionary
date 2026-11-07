@@ -1,17 +1,41 @@
 # trilingual_dictionary
 
-A new Flutter project.
+Flutter client for the Trilingual Dictionary — search or paste **English or 中文** and
+read meanings + aligned example sentences in **English · 中文 · नेपाली**.
 
-## Getting Started
+Full architecture, run commands, verification results and known gaps:
+**[project_guide.md](project_guide.md)**.
 
-This project is a starting point for a Flutter application.
+## Quick start
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+# 1. backend (FastAPI) — needs its own venv
+cd ..\backend
+.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+# 2. app
+$env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\bin;$env:Path"
+flutter run
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android emulator
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+The app works offline against the bundled dataset; search, analysis and the
+trilingual "whole translation" use the backend when it is reachable.
+
+## Checks
+
+```powershell
+flutter analyze   # no issues
+flutter test      # 5 passed
+```
+
+## Layout
+
+```
+lib/
+  app/        routing (go_router) + theme
+  core/       normalizer, API/Supabase config, constants
+  data/       Dio API client, repository, models
+  features/   search · analyze · detail · history · favorites · auth · settings
+assets/data/  offline dictionary seed
+```

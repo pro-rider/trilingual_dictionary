@@ -235,3 +235,70 @@ user's personal word list to `en_zh_ne.json`.
    keep the asset as the offline snapshot and keep the version number in sync.
 5. Add a checksum line to the release notes so clients can verify which snapshot
    they ship.
+
+---
+
+## 11. Stage 2 build — merged SQLite dictionary (2026‑11‑07, measured)
+
+The first real build exists: `backend/tools/build_dictionary.py` turns CC-CEDICT
+into a normalised SQLite database. Every number below came from an actual run,
+not an estimate.
+
+```powershell
+cd backend
+.venv\Scripts\python.exe tools\build_dictionary.py `
+  --cedict data\raw\cedict.txt.gz `
+  --out data\build\dictionary.sqlite
+```
+
+| Measured | Value |
+|---|---|
+| Source lines parsed | 125,379 (0 malformed, 30 comment lines) |
+| **Entries** (simplified + traditional + tone-less pinyin) | **123,596** |
+| Senses | 198,230 (1.60 per entry) |
+| Unique simplified / traditional / pinyin | 121,612 / 122,799 / 86,981 |
+| Duplicate keys after merge | **0** |
+| Empty glosses | 0 |
+| Build time | 7.5 s (parse 0.9 s) |
+| DB size / gzip size | 93.9 MB / 42.6 MB |
+| FTS5 trigram available | yes (substring search works) |
+
+Category coverage of the 10 requested buckets (rule-based keyword match on the
+English gloss; unmatched stays `general` and is never hidden):
+
+| Category | Entries | Category | Entries |
+|---|---|---|---|
+| general (unmatched) | 74,588 | nature | 4,761 |
+| everyday | 9,410 | business | 3,463 |
+| people_society | 6,923 | technology | 3,064 |
+| geography_environment | 6,142 | science_medicine | 2,823 |
+| language | 6,093 | tools_instruments | 1,025 |
+| transport | 5,304 | | |
+
+Flags: `is_proper` 17,060 (names kept out of default results), `is_chengyu`
+5,169, `is_classifier` 85 (curated list of measure words), classifier rows 2,325.
+
+**De-duplication rule (this is the answer to "don't extract the same word
+twice"):** an entry is the triple (simplified, traditional, tone-less pinyin).
+Lines from any source that agree on all three merge into one entry; their glosses
+are appended and exact duplicates dropped in case-insensitive comparison. Different
+readings of one character (行 xíng vs 行 háng) stay as separate entries because
+pinyin differs — that is a second word, not a duplicate. Running the same rule with
+more sources added cannot produce duplicate entries; it can only add senses.
+
+**Known limits of this build (stated, not hidden):**
+
+- Chinese-side definitions (`senses.gloss_zh`) and Nepali (`gloss_ne`) are empty —
+  CC-CEDICT ships English glosses only. `ne_status = 'none'` for every row.
+- `rarity` / `freq_rank` / `hsk_level` are NULL: no frequency list is imported yet,
+  so nothing is filtered out of default results.
+- `characters` table is empty (Unihan stage not run).
+- No examples yet (Tatoeba stage not run).
+- Category rules are keyword-based, so 60% fall into `general`; that is a
+  coverage figure, not a failure — those entries are still searchable.
+
+**Nepali translation budget, measured from this DB** (the Prompt‑4 run): 198,230
+senses, 805,499 English gloss words → ≈6.04 M input + 1.29 M output tokens,
+≈9,912 requests at 20 senses per request. Cost: **≈$2.6 on a cheap flash-class
+model, ≈$28 on GPT-class pricing**. This must be run after the Chinese definitions
+are filled, otherwise sense selection happens without context.

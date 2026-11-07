@@ -237,3 +237,83 @@ def generate_draft(word: str, lang: str) -> dict[str, str] | None:
         "example_zh": (raw.get("example_zh") or "").strip(),
         "example_ne": (raw.get("example_ne") or "").strip(),
     }
+
+
+def nepali_glosses_batch(items: list[tuple[str, str]]) -> dict[str, str]:
+    """Translate English glosses into Nepali in one call (bulk import helper).
+
+    ``items`` is ``[(key, english_gloss), ...]``. Returns ``{key: nepali}`` for
+    the entries the model answered; missing keys mean "retry later", never an
+    empty string pretending to be a translation.
+    """
+    if not ai_enabled() or not items:
+        return {}
+    lines = "\n".join(f"{k}\t{v}" for k, v in items)
+    prompt = (
+        "You are a bilingual lexicographer (English → Nepali). For each line "
+        "`key<TAB>english gloss`, give a SHORT Nepali gloss in Devanagari "
+        "script (2–6 words, the meaning a dictionary would print, never a "
+        "transliteration). Respond with STRICT JSON only:\n"
+        '{"items":[{"key":"<key>","ne":"<nepali gloss>"}]}\n'
+        "Every key must appear exactly once. No prose.\n\n" + lines
+    )
+    text, _winner, _stats = _service.complete(prompt)
+    if not text:
+        return {}
+    raw = _extract_json(text) or {}
+    # Models sometimes return a bare array instead of {"items": [...]}.
+    items = raw.get("items") if isinstance(raw, dict) else raw
+    out: dict[str, str] = {}
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        ne = str(item.get("ne") or "").strip()
+        if key and ne:
+            out[key] = ne
+    return out
+
+
+def define_words_batch(words: list[str]) -> dict[str, dict[str, str]]:
+    """Give English meaning + pinyin + Nepali for words missing from any source.
+
+    Used by importers for headwords CC-CEDICT does not cover (new coinages,
+    regional vocabulary, proper nouns). Returns ``{word: {...}}``.
+    """
+    if not ai_enabled() or not words:
+        return {}
+    listing = "\n".join(f"- {w}" for w in words)
+    prompt = (
+        "You are a trilingual dictionary (English / Simplified Chinese / "
+        "Nepali). For each Chinese string below decide whether it is a REAL "
+        "lexical item (a word, fixed compound, idiom, name, or established "
+        "term) or just a segmentation fragment / word-by-word phrase that a "
+        "dictionary would never list. Then give its English meaning, pinyin "
+        "with tone marks, part of speech, and a Nepali gloss in Devanagari. "
+        "Respond with STRICT JSON only:\n"
+        '{"items":[{"word":"<the chinese string>","is_word":true|false,'
+        '"pinyin":"<pinyin>","pos":"noun|verb|adjective|adverb|name|other",'
+        '"en":"<short english gloss>","ne":"<short nepali gloss>"}]}\n'
+        "Every string must appear exactly once. Set is_word=false for fragments "
+        "with no dictionary value. No prose.\n\n" + listing
+    )
+    text, _winner, _stats = _service.complete(prompt)
+    if not text:
+        return {}
+    raw = _extract_json(text) or {}
+    items = raw.get("items") if isinstance(raw, dict) else raw
+    out: dict[str, dict[str, str]] = {}
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        word = str(item.get("word") or "").strip()
+        if not word:
+            continue
+        out[word] = {
+            "pinyin": str(item.get("pinyin") or "").strip(),
+            "pos": str(item.get("pos") or "").strip(),
+            "en": str(item.get("en") or "").strip(),
+            "ne": str(item.get("ne") or "").strip(),
+            "is_word": bool(item.get("is_word", True)),
+        }
+    return out

@@ -55,3 +55,6 @@ app.*.map.json
 
 
 /backend/data/images/
+
+# Past-paper transcriptions and course PDFs stay local (copyrighted course material)
+/backend/data/exam/

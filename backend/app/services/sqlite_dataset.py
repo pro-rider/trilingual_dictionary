@@ -156,14 +156,29 @@ def find_entry(query: str, lang: str) -> dict[str, Any] | None:
                 if row is not None:
                     return _row_to_entry(con, row)
 
-        # English gloss: prefer a sense that starts with the query, shortest
-        # first, so "light" does not answer with "brightness of light".
+        # English gloss. A plain "shortest match wins" rule is wrong: "arrange"
+        # used to return 布局 ("arrangement") while 安排 ("to arrange") existed,
+        # because "to arrange" is longer. Score candidates instead: lead articles
+        # and "to"/"a"/"the" are stripped, an exact gloss beats a prefix, a whole
+        # word beats a substring, and HSK5 words (the ones learners actually
+        # meet) get a bonus.
         row = con.execute(
-            "SELECT e.*, s.gloss_en FROM senses s JOIN entries e "
-            "ON e.entry_id = s.entry_id "
-            "WHERE LOWER(s.gloss_en) LIKE ? || '%' AND e.is_proper = 0 "
-            "ORDER BY LENGTH(s.gloss_en), LENGTH(e.simplified) LIMIT 1",
-            (q_lower,),
+            "SELECT e.*, s.gloss_en, "
+            " CASE WHEN LOWER(TRIM(s.gloss_en)) IN (?, ?, ?, ?) THEN 3 "
+            "      WHEN LOWER(s.gloss_en) LIKE ? || ' %' OR LOWER(s.gloss_en) "
+            "           LIKE 'to ' || ? || '%' OR LOWER(s.gloss_en) LIKE ? || ',%' "
+            "        THEN 2 "
+            "      WHEN LOWER(s.gloss_en) LIKE '% ' || ? || ' %' OR LOWER(s.gloss_en) "
+            "           LIKE '% ' || ? THEN 1 "
+            "      ELSE 0 END AS match_score "
+            "FROM senses s JOIN entries e ON e.entry_id = s.entry_id "
+            "WHERE LOWER(s.gloss_en) LIKE '%' || ? || '%' AND e.is_proper = 0 "
+            "ORDER BY match_score DESC, s.sense_order, "
+            "         (e.hsk_level IS NOT NULL) DESC, "
+            "         LENGTH(s.gloss_en), e.entry_id "
+            "LIMIT 1",
+            (q_lower, "to " + q_lower, "a " + q_lower, "the " + q_lower,
+             q_lower, q_lower, q_lower, q_lower, q_lower, q_lower),
         ).fetchone()
         if row is not None:
             return _row_to_entry(con, row)

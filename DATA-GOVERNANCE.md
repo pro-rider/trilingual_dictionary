@@ -372,3 +372,82 @@ zoom, attribution + licence + confidence line under the image, and a per-categor
 material icon when there is none. The 300 MB LRU disk cache, prefetch of the first
 10 results, and the offline image index are **not** implemented — Flutter's default
 in-memory image cache is what runs today.
+
+---
+
+## 13. HSK5 word list + HSK5 past paper (2026‑11‑08, measured)
+
+Two teacher-supplied PDFs were imported into the merged database. Neither PDF is
+committed (course material); the tools and the extracted exam corpus are.
+
+### 13.1 `新HSK5词汇表（汉英）.pdf` → `backend/tools/import_hsk5.py`
+
+Layout is three columns per entry: `N．` / pinyin / headword. `pypdf` extracts the
+text in stream order, so the parser reads three lines per record. Measured:
+
+| Fact | Value |
+|---|---|
+| Pages / extractable text | 39 / yes (≈1,067 chars per page) |
+| Numbered records in the PDF | 2,500 |
+| Records parsed | **2,499** (`2499`+`2473` unique headwords) |
+| Source typo | No. 321 is written twice (331 missing), `大夫` repeated — not fixed, reported |
+| English glosses in the PDF | **none** — the file has pinyin + characters only, "汉英" describes the list, not its content |
+| Headwords already in CC‑CEDICT | **2,499 of 2,499** |
+| New entries created | **0** — the import tags + translates, it does not duplicate |
+| Entries tagged `hsk_level = 5` | **2,477** |
+| Nepali glosses written | **2,370** (`ne_failed = 33`, rerunnable) |
+| Senses translated | 2,403 (primary sense only) |
+| Runtime | **313.8 s** (`--batch 30 --threads 4`) |
+
+Rules baked into the tool: pinyin is matched tone-exact after converting tone
+marks to numerals (`ü`→`v`), so multi-reading characters resolve to the right
+entry (`大夫 dàfū` vs `dàifu`, `绿 lǜ` vs `lù`, `得 dé` vs `děi`). `--all-senses`
+translates every sense instead of `sense_order = 0` (≈7,447 rows, ≈2 h).
+
+### 13.2 `H51007.pdf` (HSK5 past paper) → `backend/tools/import_exam_words.py`
+
+The PDF is a scan: `extract_text()` returns 0 characters, and this machine has
+no Chinese OCR model (`tesseract` is installed with `eng`/`osd` only; the
+`chi_sim` download failed). So the **reading passages were transcribed by hand**
+into `backend/data/exam/h51007_passages.txt` (~20 paragraphs: 顾恺之画母, 宠物安全,
+匆忙生活, 沉默是金, 平遥古城, 百家姓, 孔明灯, 葡萄干, 河流走弯路, 茶的历史, …) — that
+directory is gitignored, since the passages are copyrighted course material. The
+listening sections (Q1–45) are multiple-choice options and were ignored on purpose;
+the handwriting section (Q91–98) and the essay prompts (Q99–100) contributed word
+lists only.
+
+`jieba` splits the corpus, keeps tokens of ≥2 CJK characters, drops a stop-word
+list, then:
+
+| Stage | Result |
+|---|---|
+| Distinct tokens | 762 |
+| Already in the dictionary | 634 → recorded in `corpus_hits` (provenance) |
+| Not found | 128 |
+| Created as new entries | **76** (e.g. 刮目相看, 孔明灯, 葡萄干, 平遥, 九霄云外) |
+| Rejected as segmentation fragments | **43** (`要笔`, `画张`, `两天`, …) — the model is asked for `is_word` and answers `false` |
+| Nepali glosses added | **346** |
+| Runtime | **86.7 s** |
+
+### 13.3 State of the database after both imports
+
+| Measured | Value |
+|---|---|
+| Entries | **123,672** (was 123,596) |
+| Senses | 198,306 |
+| `hsk_level = 5` entries | 2,477 |
+| Senses with `gloss_ne` | 3,032 / 198,306 |
+| `corpus_hits` rows (word → source text) | 710 |
+
+Live checks after both imports (`POST /api/v1/search`): `安排` → zh31619, `to arrange`,
+`व्यवस्था गर्नु`, `source = dictionary`; `葡萄干` → `raisin`, `किशमिश`; `孔明灯` →
+`sky lantern`, `आकाश बल्ब`; English `arrange` → 安排, `raisin` → 葡萄干.
+
+**Cost note:** every AI-generated gloss sits in `senses.gloss_ne` with
+`ne_status = 'pending'`, so the client labels it unverified. The 33 missing HSK5
+translations are blank rows, not bad data — rerun the tool to fill them.
+
+**Rebuild warning:** `tools/build_dictionary.py` recreates the schema from CC‑CEDICT
+and therefore drops `hsk_level`, `ai_cache` and `corpus_hits`. After a rebuild,
+rerun `import_hsk5.py`, `import_exam_words.py` and re-warm `ai_cache`.
+

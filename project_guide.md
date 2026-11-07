@@ -1,6 +1,6 @@
 # Trilingual Dictionary — Project Guide
 
-Last updated: **2026-11-08** · Status: **working end-to-end on Windows** (Flutter app + FastAPI backend + 123,596-entry SQLite dictionary + image pipeline)
+Last updated: **2026-11-08** · Status: **working end-to-end on Windows** (Flutter app + FastAPI backend + 123,672-entry SQLite dictionary, 2,477 HSK5-tagged entries + image pipeline)
 
 English / 简体中文 / नेपाली. You search or paste English **or** Chinese; the app returns
 meanings and aligned example sentences in all three languages. Nepali is output-only.
@@ -417,7 +417,45 @@ breakdown, and the `not_run` checks (watermark, NSFW, CLIP, pHash…). `--allow-
 turns on the unverified title-search tier; it produces wrong pictures and is
 inspection-only.
 
-### 8.5 Quality gate before any push
+### 8.5 Import the HSK5 word list (tag + Nepali gloss)
+
+Input is the teacher-supplied `新HSK5词汇表（汉英）.pdf` (2,500 numbered words,
+pinyin + characters, no English inside). The tool does **not** create duplicates:
+every headword is already in CC-CEDICT, so it only sets `hsk_level = 5` and fills
+`senses.gloss_ne`. Reentrant — it skips senses that already have Nepali.
+
+```powershell
+cd ...\backend
+.venv\Scripts\python.exe tools\import_hsk5.py --pdf "<path to 新HSK5词汇表（汉英）.pdf>" --db data\build\dictionary.sqlite --dry-run
+.venv\Scripts\python.exe tools\import_hsk5.py --pdf "<path>" --db data\build\dictionary.sqlite --batch 30 --threads 4
+```
+
+Measured: 2,499 records parsed (source has a duplicate number), 2,477 entries
+tagged, 2,370 Nepali glosses, 313.8 s. `--all-senses` translates all 7,447 senses
+instead of the primary one (≈2 h). Failures land in `hsk5_import.report.json`.
+
+### 8.6 Extract words from an HSK5 past paper
+
+The exam PDF is a **scan** — no text layer, and this machine has no `chi_sim`
+OCR model. Transcribe the reading passages into `backend/data/exam/<paper>.txt`
+first (plain text, one paragraph per line, options excluded). That directory is
+gitignored — exam text is course material and is not published — so the tool
+defaults to it but a fresh clone has to supply its own corpus. Then:
+
+```powershell
+cd ...\backend
+.venv\Scripts\python.exe tools\import_exam_words.py --corpus data\exam\h51007_passages.txt --db data\build\dictionary.sqlite --dry-run
+.venv\Scripts\python.exe tools\import_exam_words.py --corpus data\exam\h51007_passages.txt
+```
+
+jieba → keep ≥2-character CJK tokens → drop stop-words → match against the
+dictionary (hits recorded in `corpus_hits`) → the leftovers go to the AI, which
+also decides `is_word` so segmentation fragments (`要笔`, `画张`, `两天`) are
+rejected instead of becoming bogus entries. Measured on `H51007.pdf`: 762 tokens,
+634 hits, 128 missing, **76 new entries**, 43 fragments rejected, 346 Nepali
+glosses, 86.7 s. Report: `exam_h51007.report.json`.
+
+### 8.7 Quality gate before any push
 
 ```powershell
 cd ...\backend;  .venv\Scripts\python.exe -m pytest -q
@@ -425,7 +463,7 @@ cd ...;          flutter analyze
                  flutter test
 ```
 
-### 8.6 Commit and push
+### 8.8 Commit and push
 
 ```powershell
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
@@ -438,7 +476,7 @@ git push origin main
 Do not commit `backend/data/*`, `.env`, `.venv/`. If a doc describes behaviour
 you changed, update that doc in the same commit (§7.5).
 
-### 8.7 Common failures
+### 8.9 Common failures
 
 | Symptom | Fix |
 |---|---|

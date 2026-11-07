@@ -12,7 +12,7 @@ flutter test                    # 13 tests, < 2 s
 
 # Backend
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
-.venv\Scripts\python.exe -m pytest -q     # 39 tests, ~1.5 s
+.venv\Scripts\python.exe -m pytest -q     # 42 tests, ~1.6 s
 ```
 
 `flutter` commands require git on `PATH` (`Unable to find git in your PATH`
@@ -35,13 +35,14 @@ otherwise). No test needs the network, an API key, or Postgres.
 | Quality gate + romanisation | — | ✅ `test_quality.py` (3) | 0.5 placeholder is untested by design |
 | Text analysis (zh/en, stopwords, degrade, AI shapes, span merge) | — | ✅ `test_text_analysis.py` (12) | no adversarial Unicode |
 | Failover (retry/429/circuit/all-down/metrics) | — | ✅ `test_failover.py` (8) | no real-provider contract test |
+| English→Chinese ranking (exact gloss > substring, primary sense wins, Nepali carried through) | — | ✅ `test_english_lookup.py` (3), temp DB | real 123k DB ranking spot-checked manually |
 | Widgets / screens | partial (favorites screen) | — | other screens untested |
 | Router / navigation | ✅ 1 (favorites → detail) | — | other routes untested |
 | Repository / dataset decode | ❌ none | partial | no JSON-schema test |
 | DB models / migrations | — | ❌ none | needs a Postgres fixture |
 | Performance | ❌ | ❌ | manual measurements only |
 
-Totals: **13 Dart tests, 39 Python tests**, all green on 2026‑11‑08.
+Totals: **13 Dart tests, 42 Python tests**, all green on 2026‑11‑08.
 
 ---
 

@@ -11,7 +11,7 @@ flutter analyze                 # 0 issues required
 flutter test                    # 11 tests, < 2 s
 
 # Backend
-cd C:\Users\Administrator\Desktop\Dictionery\backend
+cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
 .venv\Scripts\python.exe -m pytest -q     # 35 tests, ~1–2 s
 ```
 

@@ -173,7 +173,7 @@ $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
 flutter analyze            # must print "No issues found!"
 flutter test               # must pass
-cd ..\backend
+cd backend
 .venv\Scripts\python.exe -m pytest -q    # must pass
 ```
 

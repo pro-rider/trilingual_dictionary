@@ -27,7 +27,7 @@ Full architecture, run commands, verification results and known gaps:
 
 ```powershell
 # 1. backend (FastAPI) — needs its own venv
-cd ..\backend
+cd backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 
 # 2. app

@@ -12,7 +12,7 @@ meanings and aligned example sentences in all three languages. Nepali is output-
 | Part | Path | Git |
 |---|---|---|
 | Flutter app | `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary` | repo `github.com/pro-rider/trilingual_dictionary`, branch `main` |
-| FastAPI backend | `C:\Users\Administrator\Desktop\Dictionery\backend` | **not a git repo yet** (untracked sibling folder) |
+| FastAPI backend | `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend` | tracked in this repo as `backend/` |
 
 Toolchain on this machine (neither is on PATH by default):
 
@@ -29,7 +29,7 @@ Flutter needs `git.exe` on PATH even to run `flutter analyze` — without it: *"
 ### Backend (FastAPI, port 8000)
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\backend
+cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 ```
 
@@ -52,7 +52,7 @@ Android emulator is the emulator itself, hence the `10.0.2.2` override.
 ### Tests
 
 ```powershell
-cd ..\backend; .venv\Scripts\python.exe -m pytest -q      # 35 passed
+cd backend; .venv\Scripts\python.exe -m pytest -q      # 35 passed
 cd ..\trilingual_dictionary; flutter analyze; flutter test # 0 issues, 11 passed
 ```
 
@@ -143,7 +143,7 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 | Priority | Gap | Notes |
 |---|---|---|
 | High | **Offline dataset is tiny** — `backend/data/seed/en_zh_ne.json` holds only 6 entries (`light, trade, mountain, water, book, teacher`). Without AI the dictionary is nearly empty. | Needs a real seed (~300–500 common words, human-reviewed Nepali). Don't ship AI-drafted Nepali as authoritative. |
-| High | **Backend isn't under version control** | `backend/` sits beside the app repo with no `.git`. Start a repo (or add it to the app repo) before the next deploy. |
+| ~~High~~ done | ~~Backend isn't under version control~~ | `backend/` now lives inside this repo and ships in the same commit history; `.env` and `.venv/` remain ignored. |
 | Medium | Supabase auth unconfigured (`SUPABASE_URL` / `SUPABASE_JWT_SECRET` empty) | `/me`, favorites and feedback stay unauthenticated; sign-in screen can't complete. |
 | Medium | No CI | `flutter analyze` + `flutter test` + `pytest` all pass locally; nothing enforces them on push. |
 | Medium | `GROQ_API_KEY` empty, legacy `AI_API_KEY` used instead | Works today (`groq_api_key or ai_api_key`), but the naming is confusing — consolidate. |

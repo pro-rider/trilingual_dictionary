@@ -35,7 +35,7 @@ flutter --version
 cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
 flutter pub get
 
-cd ..\backend
+cd backend
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -U pip
 .venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -60,7 +60,7 @@ For AI features set `AI_ENABLED=true` and provide one key
 
 ```powershell
 # backend (must be started from the backend\ directory: DATASET_PATH is relative)
-cd C:\Users\Administrator\Desktop\Dictionery\backend
+cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 # → http://127.0.0.1:8000/docs
 # → http://127.0.0.1:8000/api/v1/health
@@ -93,7 +93,7 @@ flutter analyze          # must be: No issues found!
 flutter test             # must pass
 dart format --output=none --set-exit-if-changed lib test
 
-cd ..\backend
+cd backend
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe -m scripts.validate_dataset   # after any dataset edit
 ```

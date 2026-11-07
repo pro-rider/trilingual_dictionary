@@ -1,0 +1,239 @@
+"""AI provider facade (v2 spec) — multi-provider failover.
+
+Public API stays stable: :func:`generate_draft` produces a 3-language
+(English / 中文 / नेपाली) meaning + example for an arbitrary word, routing
+through the failover chain Groq → Gemini → OpenRouter.
+
+Every AI-produced field is marked `ai_generated` / `unreviewed` and must pass
+quality + human review before being treated as authoritative.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+from app.core.config import settings
+from app.ai.base import LLMProvider
+from app.ai.failover import FailoverLLMService
+from app.ai.providers import GeminiProvider, OpenAICompatibleProvider
+
+_DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+
+
+def _build_providers() -> list[LLMProvider]:
+    # Groq uses groq_* when set, otherwise the legacy ai_* fields.
+    groq_key = settings.groq_api_key or settings.ai_api_key
+    groq_model = settings.groq_model or settings.ai_model or _DEFAULT_GROQ_MODEL
+    groq_base = settings.groq_base_url or settings.ai_base_url
+    return [
+        OpenAICompatibleProvider(
+            name="groq",
+            base_url=groq_base,
+            api_key=groq_key,
+            model=groq_model,
+            timeout=settings.groq_timeout,
+            enabled=settings.groq_enabled,
+        ),
+        GeminiProvider(
+            name="gemini",
+            base_url=settings.gemini_base_url,
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_model,
+            timeout=settings.gemini_timeout,
+            enabled=settings.gemini_enabled,
+        ),
+        OpenAICompatibleProvider(
+            name="openrouter",
+            base_url=settings.openrouter_base_url,
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model,
+            timeout=settings.openrouter_timeout,
+            enabled=settings.openrouter_enabled,
+        ),
+    ]
+
+
+def _build_service() -> FailoverLLMService:
+    order = [
+        s.strip().lower()
+        for s in settings.ai_providers_order.split(",")
+        if s.strip()
+    ]
+    return FailoverLLMService(
+        _build_providers(),
+        order,
+        max_retries=settings.ai_max_retries,
+        retry_backoff=settings.ai_retry_backoff_seconds,
+        fail_threshold=settings.circuit_fail_threshold,
+        cooldown_seconds=settings.circuit_cooldown_seconds,
+    )
+
+
+_service = _build_service()
+
+
+def ai_enabled() -> bool:
+    """True when the master switch is on AND at least one provider is keyed."""
+    return settings.ai_enabled and bool(_service.active_providers())
+
+
+def provider_stats() -> dict:
+    """Expose per-provider health/metrics for the monitoring endpoint."""
+    return _service.stats()
+
+
+def _extract_json(text: str) -> dict[str, Any] | None:
+    """Pull the first JSON object out of the model reply (handles fences)."""
+    cleaned = text.strip()
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
+    if fenced:
+        cleaned = fenced.group(1)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if not m:
+            return None
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            return None
+
+
+def _system_prompt(query: str, lang: str) -> str:
+    direction = (
+        "The user query is an ENGLISH word. Fill in the Chinese (Simplified) "
+        "and Nepali fields as translations."
+        if lang == "en"
+        else "The user query is a CHINESE (Simplified) word. Fill in the "
+        "English and Nepali fields as translations."
+    )
+    return (
+        "You are a trilingual dictionary (English / Simplified Chinese / Nepali). "
+        + direction
+        + f" The word is: {query!r}.\n"
+        "Respond with STRICT JSON only, no extra prose, matching exactly:\n"
+        "{\n"
+        '  "word_en": "<english word>",\n'
+        '  "word_zh": "<simplified chinese>",\n'
+        '  "pinyin": "<hanyu pinyin with tone marks, no spaces inside the word>",\n'
+        '  "part_of_speech": "<e.g. noun|verb|adjective|...>",\n'
+        '  "meaning_en": "<one concise English gloss>",\n'
+        '  "meaning_zh": "<one concise Simplified Chinese gloss>",\n'
+        '  "meaning_ne": "<one concise Nepali gloss in Devanagari script>",\n'
+        '  "example_en": "<one short natural English sentence using the word>",\n'
+        '  "example_zh": "<the same sentence in Simplified Chinese>",\n'
+        '  "example_ne": "<the same sentence in Nepali, Devanagari script>"\n'
+        "}\n"
+        "Keep glosses and sentences short and natural. Write Nepali in Devanagari."
+    )
+
+
+def _analysis_prompt(text: str, surfaces: list[str], lang: str) -> str:
+    listed = "\n".join(f"- {s}" for s in surfaces)
+    direction = (
+        "The text is mostly ENGLISH with the listed units to translate."
+        if lang == "en"
+        else "The text is CHINESE (Simplified) with the listed units to translate."
+    )
+    return (
+        "You are a trilingual text analyzer (English / Simplified Chinese / "
+        "Nepali). " + direction + f"\nText: {text!r}\n"
+        "For EACH listed unit, give its OWN meaning: a single word, a compound "
+        "word (e.g. 水果 = fruit, NOT 水 + 果), a phrase, or an idiom (idioms "
+        "and phrases must have their FIGURATIVE meaning, not the literal "
+        "word-by-word meaning).\n"
+        "Respond with STRICT JSON only:\n"
+        "{\n"
+        '  "words": {\n'
+        '    "<unit>": {\n'
+        '      "kind": "word|compound|phrase|idiom",\n'
+        '      "word_en": "<english>",\n'
+        '      "word_zh": "<simplified chinese>",\n'
+        '      "pinyin": "<hanyu pinyin with tone marks>",\n'
+        '      "part_of_speech": "<noun|verb|...>",\n'
+        '      "meaning_en": "<concise english gloss>",\n'
+        '      "meaning_zh": "<concise simplified chinese gloss>",\n'
+        '      "meaning_ne": "<concise nepali gloss in Devanagari>"\n'
+        "    }\n"
+        "  },\n"
+        '  "whole": { "en": "<natural whole-text translation>", '
+        '"zh": "<same in Simplified Chinese>", "ne": "<same in Nepali>" }\n'
+        "}\n"
+        "Rules: give every listed unit (do not skip any). Nepali must be "
+        "accurate, natural Devanagari — never a transliteration; if unsure, use "
+        "the closest standard Nepali term. Idioms/phrases keep their figurative "
+        "meaning. No extra prose."
+    )
+
+
+def analyze_text_with_ai(
+    text: str, surfaces: list[str], lang: str
+) -> dict | None:
+    """One batched AI call: meanings for all unresolved units + whole translation.
+
+    Returns a normalized dict ``{"words": {...}, "whole": {...}}``, or ``None``
+    when AI is disabled or every provider failed.
+    """
+    if not ai_enabled() or not surfaces:
+        return None
+    prompt = _analysis_prompt(text, surfaces, lang)
+    reply, _winner, _stats = _service.complete(prompt)
+    if not reply:
+        return None
+    raw = _extract_json(reply)
+    if not raw:
+        return None
+
+    words: dict[str, dict] = {}
+    for surf, data in (raw.get("words") or {}).items():
+        if not isinstance(data, dict):
+            continue
+        words[surf] = {
+            "kind": (data.get("kind") or "word").strip().lower(),
+            "word_en": (data.get("word_en") or "").strip(),
+            "word_zh": (data.get("word_zh") or "").strip(),
+            "pinyin": (data.get("pinyin") or "").strip(),
+            "part_of_speech": (data.get("part_of_speech") or "").strip(),
+            "meaning_en": (data.get("meaning_en") or "").strip(),
+            "meaning_zh": (data.get("meaning_zh") or "").strip(),
+            "meaning_ne": (data.get("meaning_ne") or "").strip(),
+        }
+    whole_raw = raw.get("whole") or {}
+    whole = {
+        "en": (whole_raw.get("en") or "").strip(),
+        "zh": (whole_raw.get("zh") or "").strip(),
+        "ne": (whole_raw.get("ne") or "").strip(),
+    }
+    return {"words": words, "whole": whole}
+
+
+def generate_draft(word: str, lang: str) -> dict[str, str] | None:
+    """Generate a 3-language meaning + example for an arbitrary word.
+
+    Routes through the failover chain. Returns a normalized dict of strings, or
+    ``None`` when AI is disabled or every provider failed.
+    """
+    if not ai_enabled():
+        return None
+    text, _winner, _stats = _service.complete(_system_prompt(word, lang))
+    if not text:
+        return None
+    raw = _extract_json(text)
+    if not raw:
+        return None
+
+    return {
+        "word_en": (raw.get("word_en") or "").strip(),
+        "word_zh": (raw.get("word_zh") or "").strip(),
+        "pinyin": (raw.get("pinyin") or "").strip(),
+        "part_of_speech": (raw.get("part_of_speech") or "").strip(),
+        "meaning_en": (raw.get("meaning_en") or "").strip(),
+        "meaning_zh": (raw.get("meaning_zh") or "").strip(),
+        "meaning_ne": (raw.get("meaning_ne") or "").strip(),
+        "example_en": (raw.get("example_en") or "").strip(),
+        "example_zh": (raw.get("example_zh") or "").strip(),
+        "example_ne": (raw.get("example_ne") or "").strip(),
+    }

@@ -351,6 +351,8 @@ test/
 ├── settings_history_test.dart    persistence: save / load / clamp / cap
 ├── favorites_navigation_test.dart tap a favorite → /detail route
 ├── tts_service_test.dart         TTS language mapping + fallback
+├── trilingual_speakers_test.dart one speaker per language row (EN/中文/नेपाली),
+│                                  and the empty-row "Translate now" action
 └── offline_dictionary_test.dart  real 123k-entry database, opened read-write through
                                   `OfflineDictionary(overridePath: …)`:
                                   7 tests — raisin/葡萄干/Kishmish, 安排 has Nepali,

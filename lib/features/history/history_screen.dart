@@ -39,7 +39,7 @@ class HistoryScreen extends ConsumerWidget {
                   leading: const Icon(Icons.history, color: Color(0xFF0EA5E9)),
                   title: Text(h),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () => context.go(
+                  onTap: () => context.push(
                     '/result?q=${Uri.encodeComponent(h)}&lang=${_detect(h)}',
                   ),
                 );

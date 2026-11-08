@@ -46,12 +46,15 @@ class SettingsScreen extends ConsumerWidget {
                 const Icon(Icons.format_size, color: LanguageColors.brand),
             title: 'Text size',
             subtitle: '${settings.textScale.toStringAsFixed(1)}×',
-            trailing: Slider(
-              value: settings.textScale,
-              min: 0.8,
-              max: 1.4,
-              divisions: 6,
-              onChanged: (v) => notifier.setTextScale(v),
+            trailing: SizedBox(
+              width: 168,
+              child: Slider(
+                value: settings.textScale,
+                min: 0.8,
+                max: 1.4,
+                divisions: 6,
+                onChanged: (v) => notifier.setTextScale(v),
+              ),
             ),
           ),
           _section('Language'),
@@ -122,6 +125,13 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/auth'),
             ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.record_voice_over, color: Color(0xFF64748B)),
+            title: const Text('TTS diagnosis'),
+            subtitle: const Text('Temporary: engine, voices and tap-to-sound latency'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/tts-debug'),
+          ),
           const ListTile(
             title: Text('About'),
             subtitle: Text(

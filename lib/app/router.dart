@@ -9,6 +9,7 @@ import '../features/search/home_screen.dart';
 import '../features/search/result_screen.dart';
 import '../features/analyze/analyze_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/settings/tts_diagnostic_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/detail/detail_screen.dart';
@@ -63,6 +64,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (_, _) => const SettingsScreen(),
+      ),
+      // Temporary: prompt V1 voice diagnosis. Remove when speech is fixed.
+      GoRoute(
+        path: '/tts-debug',
+        builder: (_, _) => const TtsDiagnosticScreen(),
       ),
       GoRoute(
         path: '/auth',

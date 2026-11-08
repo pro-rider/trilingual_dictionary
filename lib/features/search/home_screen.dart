@@ -66,12 +66,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           IconButton(
             tooltip: 'History',
-            onPressed: () => context.go('/history'),
+            onPressed: () => context.push('/history'),
             icon: const Icon(Icons.history),
           ),
           IconButton(
             tooltip: 'Settings',
-            onPressed: () => context.go('/settings'),
+            onPressed: () => context.push('/settings'),
             icon: const Icon(Icons.settings_outlined),
           ),
         ],

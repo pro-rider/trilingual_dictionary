@@ -79,6 +79,17 @@ def main() -> int:
           f"(skipped {len(cands) - len(todo):,} exact duplicates)", flush=True)
 
     done: list[dict] = []
+    done_words: set[str] = set()
+    enrich_path = out_dir / "enrichments.jsonl"
+    if enrich_path.exists():
+        for line in enrich_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                done.append(rec)
+                done_words.add(rec["headword"])
+        print(f"resuming: {len(done):,} candidates already enriched", flush=True)
+    fh_out = enrich_path.open("a", encoding="utf-8", newline="\n")
+    todo = [c for c in todo if c["headword"] not in done_words]
     rejected: list[dict] = []
     malformed: list[dict] = []
     pending: list[dict] = []
@@ -146,6 +157,10 @@ def main() -> int:
                     "model": "failover-chain",
                     "enriched_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 })
+                # checkpoint every record: the quota wall can kill this job at
+                # any moment, and rolling back a pass would throw away real work
+                fh_out.write(json.dumps(done[-1], ensure_ascii=False) + "\n")
+                fh_out.flush()
             el = time.time() - started
             rate = len(done) / max(el, 1)
             print(f"  pass {attempt}  {min(start + args.batch, len(queue)):>5}/{len(queue)}  "
@@ -158,9 +173,7 @@ def main() -> int:
             time.sleep(args.retry_wait)
     pending = queue
 
-    with (out_dir / "enrichments.jsonl").open("w", encoding="utf-8", newline="\n") as fh:
-        for r in done:
-            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    fh_out.close()
     with (out_dir / "rejected.jsonl").open("w", encoding="utf-8", newline="\n") as fh:
         for r in rejected:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")

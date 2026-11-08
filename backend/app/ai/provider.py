@@ -328,6 +328,54 @@ def enrich_senses_batch(
     return out
 
 
+def translate_gloss_queue_batch(
+    items: list[tuple[str, str, str, str]]
+) -> dict[str, dict[str, str]]:
+    """Translate English glosses into Nepali and back-translate for QA.
+
+    ``items`` is ``[(key, chinese_headword, english_gloss, example), ...]``.
+    One call returns the Nepali gloss plus a literal back-translation so the
+    caller can score the result without a second round-trip. Returns
+    ``{key: {"ne","back_en"}}``; a missing key means "retry later".
+    """
+    if not ai_enabled() or not items:
+        return {}
+    lines = "\n".join(
+        f"{k}\t{zh}\t{en}\t{ex or '-'}" for k, zh, en, ex in items
+    )
+    prompt = (
+        "You are a Nepali lexicographer building a learner's dictionary. Each "
+        "line is `key<TAB>chinese word<TAB>english gloss<TAB>example sentence "
+        "or -`. For each line produce:\n"
+        "1. ne: the Nepali meaning in Devanagari, 1–3 words, the gloss a "
+        "dictionary would print. Never a transliteration of the English, never "
+        "Latin letters, never an explanation, never the English text.\n"
+        "2. back_en: a literal English back-translation of that Nepali gloss, "
+        "so a reviewer can check the sense survived.\n"
+        "Use the Chinese word and the example to pick the right sense. Respond "
+        "with STRICT JSON only:\n"
+        '{"items":[{"key":"<key>","ne":"<nepali>","back_en":"<english>"}]}\n'
+        "Every key must appear exactly once. No prose.\n\n" + lines
+    )
+    text, _winner, _stats = _service.complete(prompt)
+    if not text:
+        return {}
+    raw = _extract_json(text) or {}
+    out_items = raw.get("items") if isinstance(raw, dict) else raw
+    out: dict[str, dict[str, str]] = {}
+    for item in out_items or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        out[key] = {
+            "ne": str(item.get("ne") or "").strip(),
+            "back_en": str(item.get("back_en") or "").strip(),
+        }
+    return out
+
+
 def define_words_batch(words: list[str]) -> dict[str, dict[str, str]]:
     """Give English meaning + pinyin + Nepali for words missing from any source.
 

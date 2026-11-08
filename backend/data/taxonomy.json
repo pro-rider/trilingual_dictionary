@@ -1,0 +1,699 @@
+{
+  "nature": {
+    "parent": null,
+    "keywords": [
+      "动物",
+      "植物",
+      "生物",
+      "生态系统",
+      "物种",
+      "自然"
+    ]
+  },
+  "nature.animal": {
+    "parent": "nature",
+    "keywords": [
+      "动物",
+      "哺乳",
+      "鸟",
+      "昆虫",
+      "鱼",
+      "爬行",
+      "两栖",
+      "兽",
+      "禽",
+      "脊椎",
+      "无脊椎"
+    ]
+  },
+  "nature.plant": {
+    "parent": "nature",
+    "keywords": [
+      "植物",
+      "花",
+      "树",
+      "果",
+      "蔬菜",
+      "草本",
+      "农作物",
+      "叶",
+      "根",
+      "种子"
+    ]
+  },
+  "nature.microbe": {
+    "parent": "nature",
+    "keywords": [
+      "微生物",
+      "细菌",
+      "病毒",
+      "真菌",
+      "寄生虫",
+      "菌"
+    ]
+  },
+  "science": {
+    "parent": null,
+    "keywords": [
+      "科学",
+      "研究",
+      "理论",
+      "实验"
+    ]
+  },
+  "science.biology": {
+    "parent": "science",
+    "keywords": [
+      "生物学",
+      "细胞",
+      "遗传",
+      "基因",
+      "DNA",
+      "RNA",
+      "蛋白质",
+      "酶",
+      "进化",
+      "生态"
+    ]
+  },
+  "science.chemistry": {
+    "parent": "science",
+    "keywords": [
+      "化学",
+      "分子",
+      "原子",
+      "元素",
+      "化合物",
+      "反应",
+      "酸碱"
+    ]
+  },
+  "science.physics": {
+    "parent": "science",
+    "keywords": [
+      "物理",
+      "力",
+      "能量",
+      "光",
+      "电",
+      "热",
+      "波",
+      "量子",
+      "相对论"
+    ]
+  },
+  "science.math": {
+    "parent": "science",
+    "keywords": [
+      "数学",
+      "函数",
+      "方程",
+      "几何",
+      "概率",
+      "统计",
+      "矩阵"
+    ]
+  },
+  "science.astronomy": {
+    "parent": "science",
+    "keywords": [
+      "天文",
+      "行星",
+      "恒星",
+      "星系",
+      "宇宙",
+      "太阳",
+      "月球"
+    ]
+  },
+  "science.geology": {
+    "parent": "science",
+    "keywords": [
+      "地质",
+      "岩石",
+      "矿物",
+      "地层",
+      "板块",
+      "火山"
+    ]
+  },
+  "medicine": {
+    "parent": null,
+    "keywords": [
+      "医学",
+      "临床",
+      "疾病",
+      "治疗",
+      "诊断",
+      "患者"
+    ]
+  },
+  "medicine.disease": {
+    "parent": "medicine",
+    "keywords": [
+      "疾病",
+      "病",
+      "症",
+      "感染",
+      "炎",
+      "癌",
+      "肿瘤",
+      "综合征"
+    ]
+  },
+  "medicine.anatomy": {
+    "parent": "medicine",
+    "keywords": [
+      "器官",
+      "组织",
+      "骨骼",
+      "肌肉",
+      "神经",
+      "血管",
+      "心脏",
+      "细胞结构"
+    ]
+  },
+  "medicine.drug": {
+    "parent": "medicine",
+    "keywords": [
+      "药物",
+      "药品",
+      "抗生素",
+      "疫苗",
+      "剂量",
+      "处方"
+    ]
+  },
+  "medicine.device": {
+    "parent": "medicine",
+    "keywords": [
+      "医疗设备",
+      "扫描仪",
+      "显微镜",
+      "影像",
+      "放射",
+      "器械"
+    ]
+  },
+  "transport": {
+    "parent": null,
+    "keywords": [
+      "交通",
+      "运输",
+      "车辆",
+      "行驶"
+    ]
+  },
+  "transport.road": {
+    "parent": "transport",
+    "keywords": [
+      "汽车",
+      "卡车",
+      "公交车",
+      "摩托车",
+      "自行车",
+      "轮胎",
+      "底盘",
+      "发动机",
+      "变速箱"
+    ]
+  },
+  "transport.rail": {
+    "parent": "transport",
+    "keywords": [
+      "火车",
+      "铁路",
+      "轨道",
+      "列车",
+      "高铁",
+      "地铁"
+    ]
+  },
+  "transport.air": {
+    "parent": "transport",
+    "keywords": [
+      "飞机",
+      "航空",
+      "机场",
+      "飞行",
+      "航班"
+    ]
+  },
+  "transport.water": {
+    "parent": "transport",
+    "keywords": [
+      "船",
+      "船舶",
+      "航运",
+      "港口",
+      "集装箱"
+    ]
+  },
+  "transport.infra": {
+    "parent": "transport",
+    "keywords": [
+      "交通工程",
+      "道路",
+      "公路",
+      "通行能力",
+      "信号灯",
+      "规划"
+    ]
+  },
+  "tools": {
+    "parent": null,
+    "keywords": [
+      "工具",
+      "仪器",
+      "设备",
+      "机械"
+    ]
+  },
+  "tools.hand": {
+    "parent": "tools",
+    "keywords": [
+      "锤",
+      "钳",
+      "螺丝刀",
+      "扳手",
+      "锯",
+      "工具"
+    ]
+  },
+  "tools.machine": {
+    "parent": "tools",
+    "keywords": [
+      "机械",
+      "机床",
+      "齿轮",
+      "轴承",
+      "传动",
+      "液压"
+    ]
+  },
+  "tools.instrument": {
+    "parent": "tools",
+    "keywords": [
+      "仪器",
+      "测量",
+      "传感器",
+      "仪表",
+      "显微镜",
+      "望远镜"
+    ]
+  },
+  "tools.music": {
+    "parent": "tools",
+    "keywords": [
+      "乐器",
+      "钢琴",
+      "小提琴",
+      "鼓",
+      "吉他"
+    ]
+  },
+  "technology": {
+    "parent": null,
+    "keywords": [
+      "技术",
+      "计算机",
+      "软件",
+      "网络",
+      "数字"
+    ]
+  },
+  "technology.computer": {
+    "parent": "technology",
+    "keywords": [
+      "计算机",
+      "硬件",
+      "处理器",
+      "内存",
+      "芯片",
+      "服务器"
+    ]
+  },
+  "technology.software": {
+    "parent": "technology",
+    "keywords": [
+      "软件",
+      "编程",
+      "代码",
+      "算法",
+      "程序",
+      "操作系统"
+    ]
+  },
+  "technology.data": {
+    "parent": "technology",
+    "keywords": [
+      "数据库",
+      "数据",
+      "索引",
+      "存储",
+      "查询"
+    ]
+  },
+  "technology.ai": {
+    "parent": "technology",
+    "keywords": [
+      "人工智能",
+      "机器学习",
+      "神经网络",
+      "深度学习",
+      "模型",
+      "训练"
+    ]
+  },
+  "technology.network": {
+    "parent": "technology",
+    "keywords": [
+      "网络",
+      "协议",
+      "互联网",
+      "网络安全",
+      "加密",
+      "路由器"
+    ]
+  },
+  "technology.robot": {
+    "parent": "technology",
+    "keywords": [
+      "机器人",
+      "自动化",
+      "传感器",
+      "控制系统"
+    ]
+  },
+  "technology.electronics": {
+    "parent": "technology",
+    "keywords": [
+      "电子",
+      "电路",
+      "半导体",
+      "芯片",
+      "信号"
+    ]
+  },
+  "society": {
+    "parent": null,
+    "keywords": [
+      "社会",
+      "人",
+      "文化",
+      "教育",
+      "法律",
+      "政府"
+    ]
+  },
+  "society.family": {
+    "parent": "society",
+    "keywords": [
+      "家庭",
+      "亲属",
+      "父母",
+      "婚姻",
+      "子女"
+    ]
+  },
+  "society.profession": {
+    "parent": "society",
+    "keywords": [
+      "职业",
+      "工作",
+      "职工",
+      "专业",
+      "行业"
+    ]
+  },
+  "society.education": {
+    "parent": "society",
+    "keywords": [
+      "教育",
+      "学校",
+      "学生",
+      "课程",
+      "考试",
+      "大学"
+    ]
+  },
+  "society.government": {
+    "parent": "society",
+    "keywords": [
+      "政府",
+      "政策",
+      "法律",
+      "法规",
+      "管理",
+      "行政"
+    ]
+  },
+  "society.culture": {
+    "parent": "society",
+    "keywords": [
+      "文化",
+      "艺术",
+      "传统",
+      "节日",
+      "宗教",
+      "文学"
+    ]
+  },
+  "society.sport": {
+    "parent": "society",
+    "keywords": [
+      "体育",
+      "运动",
+      "比赛",
+      "运动员",
+      "奥运"
+    ]
+  },
+  "daily": {
+    "parent": null,
+    "keywords": [
+      "生活",
+      "日常",
+      "家庭",
+      "饮食",
+      "衣着"
+    ]
+  },
+  "daily.food": {
+    "parent": "daily",
+    "keywords": [
+      "食物",
+      "食品",
+      "烹饪",
+      "菜",
+      "饮品",
+      "米",
+      "肉",
+      "调味"
+    ]
+  },
+  "daily.clothing": {
+    "parent": "daily",
+    "keywords": [
+      "服装",
+      "衣",
+      "鞋",
+      "帽",
+      "布料",
+      "纺织"
+    ]
+  },
+  "daily.home": {
+    "parent": "daily",
+    "keywords": [
+      "家具",
+      "家居",
+      "房屋",
+      "建筑",
+      "厨房",
+      "家电"
+    ]
+  },
+  "geography": {
+    "parent": null,
+    "keywords": [
+      "地理",
+      "环境",
+      "地区",
+      "气候"
+    ]
+  },
+  "geography.place": {
+    "parent": "geography",
+    "keywords": [
+      "国家",
+      "城市",
+      "地区",
+      "省",
+      "山脉",
+      "河流",
+      "海洋",
+      "湖泊"
+    ]
+  },
+  "geography.climate": {
+    "parent": "geography",
+    "keywords": [
+      "气候",
+      "天气",
+      "温度",
+      "降水",
+      "季风",
+      "温室"
+    ]
+  },
+  "geography.resource": {
+    "parent": "geography",
+    "keywords": [
+      "资源",
+      "矿产",
+      "能源",
+      "石油",
+      "煤炭",
+      "水资"
+    ]
+  },
+  "geography.pollution": {
+    "parent": "geography",
+    "keywords": [
+      "污染",
+      "排放",
+      "废",
+      "治理",
+      "生态破坏"
+    ]
+  },
+  "business": {
+    "parent": null,
+    "keywords": [
+      "商业",
+      "经济",
+      "金融",
+      "贸易",
+      "管理"
+    ]
+  },
+  "business.finance": {
+    "parent": "business",
+    "keywords": [
+      "金融",
+      "银行",
+      "投资",
+      "利率",
+      "货币",
+      "股票",
+      "融资"
+    ]
+  },
+  "business.accounting": {
+    "parent": "business",
+    "keywords": [
+      "会计",
+      "财务",
+      "成本",
+      "报表",
+      "审计",
+      "利润"
+    ]
+  },
+  "business.trade": {
+    "parent": "business",
+    "keywords": [
+      "贸易",
+      "进出口",
+      "关税",
+      "物流",
+      "供应链",
+      "海关"
+    ]
+  },
+  "business.marketing": {
+    "parent": "business",
+    "keywords": [
+      "营销",
+      "市场",
+      "品牌",
+      "广告",
+      "客户",
+      "定位"
+    ]
+  },
+  "business.agri": {
+    "parent": "business",
+    "keywords": [
+      "农业",
+      "种植",
+      "养殖",
+      "灌溉",
+      "作物"
+    ]
+  },
+  "business.industry": {
+    "parent": "business",
+    "keywords": [
+      "工业",
+      "制造",
+      "建筑",
+      "工程",
+      "生产线"
+    ]
+  },
+  "language": {
+    "parent": null,
+    "keywords": [
+      "语言",
+      "语法",
+      "词",
+      "句子",
+      "翻译"
+    ]
+  },
+  "language.grammar": {
+    "parent": "language",
+    "keywords": [
+      "语法",
+      "词性",
+      "句式",
+      "时态",
+      "助词"
+    ]
+  },
+  "language.idiom": {
+    "parent": "language",
+    "keywords": [
+      "成语",
+      "谚语",
+      "俗语"
+    ]
+  },
+  "language.phrase": {
+    "parent": "language",
+    "keywords": [
+      "短语",
+      "搭配",
+      "词组"
+    ]
+  },
+  "language.synonym": {
+    "parent": "language",
+    "keywords": [
+      "同义词",
+      "反义词",
+      "近义"
+    ]
+  },
+  "language.abbrev": {
+    "parent": "language",
+    "keywords": [
+      "缩写",
+      "简称",
+      "略语"
+    ]
+  }
+}

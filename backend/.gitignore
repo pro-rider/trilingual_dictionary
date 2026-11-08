@@ -19,3 +19,11 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
+
+# R1 cleaned output (derived, reproducible)
+data/clean/
+data/r2/
+data/r3/
+data/r4/
+data/r5/
+data/backups/

@@ -1,0 +1,76 @@
+name: translation-agent-tests
+
+# STAGED FILE — belongs at .github/workflows/translation-agent-tests.yml
+# The repository was unreachable when this was written, so it could not be
+# placed there. Move it verbatim; do not create a second workflow.
+
+on:
+  push:
+    paths:
+      - "translation_agent/**"
+      - ".github/workflows/translation-agent-tests.yml"
+  pull_request:
+    paths:
+      - "translation_agent/**"
+      - ".github/workflows/translation-agent-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  agent-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: translation_agent
+    steps:
+      # Actions are referenced by major-version tag. Full-SHA pinning is
+      # strongly recommended; the exact SHAs must be taken from the GitHub
+      # UI — they are deliberately not invented here.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=8" "pytest-randomly>=3"
+
+      - name: Refuse provider credentials
+        # The suite must pass with no credentials present. If any provider key
+        # is set in the job environment, fail loudly rather than silently
+        # testing a different configuration.
+        run: |
+          fail=0
+          for var in OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GROQ_API_KEY OPENROUTER_API_KEY; do
+            if [ -n "${!var}" ]; then
+              echo "::error::provider credential $var is present in the job environment"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Run tests
+        run: |
+          PYTHONPATH=src python -m pytest -v 2>&1 | tee test-output.txt
+
+      - name: Run tests with randomized order
+        # pytest-randomly picks a fresh seed on every run and prints it in the
+        # header, so the order differs per CI run without a fixed seed here.
+        # `--randomly-seed=random` is NOT valid (it wants an integer or "last").
+        run: |
+          PYTHONPATH=src python -m pytest -v -p randomly 2>&1 | tee -a test-output.txt
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: translation-agent-test-output
+          path: translation_agent/test-output.txt
+          if-no-files-found: warn
+          retention-days: 14

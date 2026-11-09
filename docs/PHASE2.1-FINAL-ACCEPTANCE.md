@@ -146,3 +146,26 @@ Re-measured after the fingerprint change: rehearsal `ok: true`, content
 unchanged. Backend suite: **168 passed, 0 failed**. Dart suite unchanged at
 **57 passed** (no Dart file touched in this round).
 
+## Revision 3 — operational-closure round
+
+| gap you named | what closed it | evidence |
+| --- | --- | --- |
+| hard stop was only advisory | gates now live inside the suite: no `assert` in any gate script, every gate can exit non-zero, asset pin check, fingerprint rules, concurrency | `backend/tests/test_execution_guards.py` (14), `tests/test_fingerprint_contract.py` (8) |
+| fingerprint must be permanently locked | `FINGERPRINT_VERSION = 1` in code and in the returned payload; a version bump is a breaking change that forces re-measurement | `schema.content_fingerprint`, `tools/fingerprint.py` |
+| "confirm separator rules covered" | the separator forgery the question implied was **real**: `("x\x1ey","")` and `("x","y")` hashed identically. Fields are now length-prefixed | two new tests: field-separator forgery, row-separator forgery |
+| docs hygiene / single source of truth | `docs/README.md` states the authority order; the corrections doc carries a superseded banner | `docs/README.md`, `PHASE2.1-CORRECTIONS.md` |
+| asset replacement must be mechanical, not a promise | `docs/ASSET-PINS.json` + `tools/check_asset_pin.py`, run in the suite; a changed asset fails | pin check `unchanged` for both stores |
+| closure prompt | `docs/PHASE2.1-CLOSURE-CHECKLIST.md` — four items, exact commands, evidence slots | — |
+
+Re-measured: rehearsal `ok: true`, content `4656e33b…`; pin check `unchanged` for
+`dictionary.sqlite` and `translations.db`; backend **185 passed, 0 failed**.
+
+Remote CI (S-04) is **still open and cannot be closed here**: no `gh` CLI on this
+machine and the repo API answers 404 unauthenticated. It needs one run by someone
+with repo access, on the pushed sha.
+
+Status: implementation complete; operational closure has **two** blockers left —
+C1 (remote CI evidence) and C2 (go/no-go on the 5 quarantine candidates). Not
+closed, not frozen, asset untouched.
+
+

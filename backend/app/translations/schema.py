@@ -165,6 +165,21 @@ def snapshot(path):
 
 NULL_SENTINEL = "\x00NULL"
 
+#: Bumping this is a breaking contract change: every recorded fingerprint in a
+#: report, a pin file or a review comment becomes comparable only within its own
+#: version. Never change the algorithm without bumping it and re-measuring.
+FINGERPRINT_VERSION = 1
+
+
+def _field_bytes(value):
+    """Length-prefix every field so a value can never imitate a separator.
+
+    Without the prefix, ``("x\x1ey", "")`` and ``("x", "y")`` would produce the
+    same byte stream. The declared length makes the encoding unambiguous.
+    """
+    raw = (NULL_SENTINEL if value is None else str(value)).encode("utf-8")
+    return b"%d:%s" % (len(raw), raw)
+
 
 def _order_by(conn, table):
     """Canonical ordering: the primary key, or every column when there is none.
@@ -183,17 +198,22 @@ def _order_by(conn, table):
 def content_fingerprint(path):
     """Deterministic content hash of every table (definition, verbatim).
 
+    Version: ``FINGERPRINT_VERSION = 1``. Changing any rule below is a breaking
+    change — bump the version and re-measure every recorded fingerprint.
+
     * Scope: every user table; ``sqlite_*`` internal tables are excluded.
-    * Per row: every column value, in declared column order, is stringified with
-      ``str()``; ``None`` becomes ``\\x00NULL`` so NULL and ``''`` differ; fields
-      are joined with ``\\x1e`` and rows with ``\\x1d``.
+    * Per field: ``str()`` of the value (``None`` → ``\\x00NULL`` so NULL and
+      ``''`` differ), UTF-8, prefixed with its byte length and ``:``; fields are
+      joined with ``\\x1e`` and rows with ``\\x1d``. The length prefix makes the
+      encoding unambiguous, so no value can imitate a separator.
     * No normalisation: bytes are hashed exactly as stored (no Unicode NFC/NFKC,
       no whitespace collapsing, no case folding), so a real value change always
       changes the hash.
     * Ordering: primary key when a table has one, otherwise every column.
     * Per table: sha256 of that stream plus a row count.
-    * Combined: sha256 over ``table|rows|sha256`` for tables sorted by name, with
-      ``user_version`` prefixed — a schema bump is therefore visible.
+    * Combined: sha256 over ``fp<version>``, ``v<user_version>`` and
+      ``table|rows|sha256`` sorted by table name — a schema or rule bump is
+      therefore visible.
     * Excluded on purpose: page layout, WAL state, ``rowid`` (when not a declared
       column), file bytes, and free-page contents. Copying a database can change
       all of those while the logical content stays identical.
@@ -211,17 +231,16 @@ def content_fingerprint(path):
             chunk = hashlib.sha256()
             rows = 0
             for row in conn.execute("select * from %s%s" % (table, _order_by(conn, table))):
-                chunk.update("\x1e".join(
-                    NULL_SENTINEL if v is None else str(v) for v in row).encode("utf-8"))
+                chunk.update(b"\x1e".join(_field_bytes(v) for v in row))
                 chunk.update(b"\x1d")
                 rows += 1
             per_table[table] = {"rows": rows, "sha256": chunk.hexdigest()}
         combined = hashlib.sha256(("\n".join(
-            ["v%d" % user_version(conn)] +
+            ["fp%d" % FINGERPRINT_VERSION, "v%d" % user_version(conn)] +
             ["%s|%s|%s" % (t, per_table[t]["rows"], per_table[t]["sha256"])
              for t in sorted(per_table)])).encode("utf-8")).hexdigest()
-        return {"tables": per_table, "content_sha256": combined,
-                "integrity": integrity_check(conn)}
+        return {"fingerprint_version": FINGERPRINT_VERSION, "tables": per_table,
+                "content_sha256": combined, "integrity": integrity_check(conn)}
     finally:
         conn.close()
 

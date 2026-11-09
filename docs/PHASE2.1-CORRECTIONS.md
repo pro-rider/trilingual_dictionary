@@ -1,3 +1,6 @@
+> **Superseded for acceptance purposes** — see `PHASE2.1-FINAL-ACCEPTANCE.md` and `PHASE2.1-EXECUTION-CONTRACT.md`.
+> Authority order is listed in `docs/README.md`. This file is kept as a dated record.
+
 # Phase 2.1 — schema corrections before freeze
 
 Scope: fix the three critical issues and answer the nine data-ownership

@@ -107,15 +107,37 @@ an asset does not authorise touching the asset itself.
 
 ## 7. Fingerprint — one definition, no variants
 
+Version **`FINGERPRINT_VERSION = 1`**. Changing any rule below is a breaking
+contract change: bump the version and re-measure every recorded fingerprint
+(report, pin file, review comment) in the same commit.
+
 Per `schema.content_fingerprint`, reproduced in `tools/fingerprint.py`: every user
-table; every column in declared order; `str()` values; `None` → `\x00NULL`;
-`\x1e` between fields and `\x1d` between rows; ordering by primary key when a
-table has one, otherwise by all columns; per-table sha256 + row count; combined
-sha256 over `v<user_version>` and `table|rows|sha` sorted by table.
+table; every column in declared order; `str()` values; `None` → `\x00NULL`; each
+field prefix-length-encoded (`<byte-length>:<utf8>`), joined with `\x1e`, rows
+split by `\x1d`; ordering by primary key when a table has one, otherwise by all
+columns; per-table sha256 + row count; combined sha256 over `fp<version>`,
+`v<user_version>` and `table|rows|sha` sorted by table.
+
+The length prefix is not decoration: without it `("x\x1ey", "")` and `("x", "y")`
+hash identically, and a value could forge a row boundary. Two tests pin that.
 
 No NFC/NFKC, no whitespace collapsing, no case folding, no `rowid`, no file bytes,
 no WAL or page-layout state. A fingerprint is evidence of *equal values*, not of
 a recoverable file, and never a substitute for an integrity check.
+
+## 7a. Mechanical enforcement (what a reviewer does not have to remember)
+
+| guard | where |
+| --- | --- |
+| no `assert` in any gate script; every gate can exit non-zero | `backend/tests/test_execution_guards.py` |
+| shipped assets match `docs/ASSET-PINS.json`; a changed asset fails | `backend/tools/check_asset_pin.py` |
+| fingerprint version, NULL/separator/ordering rules | `backend/tests/test_fingerprint_contract.py` |
+| golden drift | `backend/tools/check_translation_golden.py` |
+| second writer rejected, no partial batch | `backend/tests/test_concurrent_writers.py` |
+
+These run in the backend suite, so they are enforced on every test run rather than
+by vigilance. A PR that changed a shipped asset, or replaced a gate with an
+`assert`, fails the suite without anyone noticing out loud.
 
 ## 8. Concurrency (decided, not deferred)
 

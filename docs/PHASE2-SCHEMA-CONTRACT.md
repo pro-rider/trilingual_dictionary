@@ -457,18 +457,23 @@ the integrity signal.
 
 ### 13.8 Content fingerprint — the one definition
 
+Version `FINGERPRINT_VERSION = 1`; a rule change bumps it and re-measures every
+recorded value.
+
 `content_fingerprint()` (and `tools/fingerprint.py`): every user table
 (`sqlite_*` excluded); every column in declared order; `str()` values with
-`None → \x00NULL`; `\x1e` between fields, `\x1d` between rows; ordering by
+`None → \x00NULL`; each field **length-prefixed** (`<len>:<utf8>`) so no value can
+imitate a separator, fields joined with `\x1e`, rows with `\x1d`; ordering by
 primary key when present, otherwise by **all** columns (so a table without a PK
 still hashes deterministically); per-table sha256 + row count; combined sha256
-over `v<user_version>` and `table|rows|sha` sorted by table name.
+over `fp<version>`, `v<user_version>` and `table|rows|sha` sorted by table name.
 
 None of the following is normalised: Unicode form, whitespace, case, numeric
 formatting. `rowid`, page layout, WAL state and file bytes are excluded. A
 fingerprint therefore proves *equal values*, never a recoverable file — that is
 `backup()`'s job — and the two must be reported separately. Contract tests:
-`backend/tests/test_fingerprint_contract.py`.
+`backend/tests/test_fingerprint_contract.py` (order independence, backup copy,
+NULL ≠ `''`, trailing space, separator forgery, version, schema bump).
 
 ### 13.9 Concurrency — single-writer, fail fast
 

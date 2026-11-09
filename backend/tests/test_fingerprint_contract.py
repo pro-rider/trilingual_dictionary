@@ -73,3 +73,25 @@ def test_a_schema_bump_is_visible_in_the_fingerprint(tmp_path):
     b = _make(tmp_path / "b.db", [(1, "water", "पानी")], [])
     assert schema.content_fingerprint(a)["content_sha256"] != \
         schema.content_fingerprint(b)["content_sha256"]
+
+
+def test_a_value_containing_the_field_separator_cannot_imitate_two_fields(tmp_path):
+    """Without length prefixes ("x\\x1ey","") and ("x","y") would collide."""
+    a = _make(tmp_path / "a.db", [(1, "x\x1ey", "")], [])
+    b = _make(tmp_path / "b.db", [(1, "x", "y")], [])
+    assert schema.content_fingerprint(a)["content_sha256"] != \
+        schema.content_fingerprint(b)["content_sha256"]
+
+
+def test_a_field_containing_a_chunk_separator_cannot_imitate_a_row(tmp_path):
+    a = _make(tmp_path / "a.db", [(1, "x\x1d", "")], [])
+    b = _make(tmp_path / "b.db", [(1, "x", "")], [])   # also one row, different text
+    assert schema.content_fingerprint(a)["content_sha256"] != \
+        schema.content_fingerprint(b)["content_sha256"]
+
+
+def test_the_fingerprint_carries_its_definition_version(tmp_path):
+    a = _make(tmp_path / "a.db", [(1, "water", "पानी")], [])
+    result = schema.content_fingerprint(a)
+    assert result["fingerprint_version"] == schema.FINGERPRINT_VERSION == 1
+    assert result["integrity"] == "ok"

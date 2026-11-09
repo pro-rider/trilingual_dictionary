@@ -1,0 +1,18 @@
+{
+  "note": "Shipped-asset pins. Changing any hash here is an approved asset change: evidence report -> explicit approval -> its own commit. Never update this file to make a check pass.",
+  "pins": [
+    {
+      "path": "backend/data/build/dictionary.sqlite",
+      "sha256": "3f9e5f464f18aa75638c7c95ba21b333eb3a42e33783ff9de21b01ec39f171f3",
+      "bytes": 100769792,
+      "approved_by": "phase2.1 baseline (773625f), unchanged through 2026-11-09",
+      "known_defect": "fts_zh missing entry ids 123597-123672 (76 rows) — accepted until an approved rebuild"
+    },
+    {
+      "path": "backend/data/build/translations.db",
+      "sha256": "2a6e428467b611f15ab954084b83fe4a4d81181c9250c2b00dc7ce69566cf036",
+      "approved_by": "phase2.1 schema-4 migration, 3,245 legacy rows",
+      "known_defect": null
+    }
+  ]
+}

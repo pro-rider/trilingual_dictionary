@@ -1,0 +1,48 @@
+{
+  "note": "Synthetic senses for deterministic tests only. These are NOT production rows and must never be imported.",
+  "fixture": true,
+  "senses": [
+    {
+      "sense_key": "fixture:1001",
+      "entry_id": 1001,
+      "simplified": "水",
+      "pinyin": "shui3",
+      "gloss_en": "water"
+    },
+    {
+      "sense_key": "fixture:1002",
+      "entry_id": 1002,
+      "simplified": "书",
+      "pinyin": "shu1",
+      "gloss_en": "book"
+    },
+    {
+      "sense_key": "fixture:1003",
+      "entry_id": 1003,
+      "simplified": "山",
+      "pinyin": "shan1",
+      "gloss_en": "mountain"
+    },
+    {
+      "sense_key": "fixture:1004",
+      "entry_id": 1004,
+      "simplified": "朋友",
+      "pinyin": "peng2 you5",
+      "gloss_en": "friend"
+    },
+    {
+      "sense_key": "fixture:1005",
+      "entry_id": 1005,
+      "simplified": "吃",
+      "pinyin": "chi1",
+      "gloss_en": "to eat"
+    },
+    {
+      "sense_key": "fixture:1006",
+      "entry_id": 1006,
+      "simplified": "时间",
+      "pinyin": "shi2 jian1",
+      "gloss_en": "time"
+    }
+  ]
+}

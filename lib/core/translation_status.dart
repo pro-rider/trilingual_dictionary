@@ -31,6 +31,15 @@ class TranslationStatus {
     required this.attribution,
   });
 
+  /// How the source record was tied to this sense. Only these are defensible;
+  /// `headword`, `heuristic` and a missing method are not.
+  static const List<String> defensibleSenseMatches = <String>[
+    'sense_gloss',
+    'sense_id',
+    'qid',
+    'article',
+  ];
+
   final String code;
   final String label;
 
@@ -43,6 +52,10 @@ class TranslationStatus {
   /// The shared ladder. Missing dimensions fall back to the database defaults
   /// (`not_verified`, `incomplete`, `labeled`), so an old row cannot read as
   /// verified by accident.
+  ///
+  /// "Source-supported" is deliberately narrow: a source URL alone is not
+  /// enough, the evidence must be lexical Nepali and the sense match defensible
+  /// (see [defensibleSenseMatches]).
   factory TranslationStatus.derive({
     String? publicationStatus,
     String? humanVerification,
@@ -50,6 +63,8 @@ class TranslationStatus {
     String? evidenceStrength,
     String? generationMethod,
     String? originSource,
+    String? evidenceLanguage,
+    String? senseMatchMethod,
   }) {
     final publication = publicationStatus ?? 'labeled';
     final verification = humanVerification ?? 'not_verified';
@@ -57,6 +72,12 @@ class TranslationStatus {
     final strength = evidenceStrength ?? 'none';
     final method = generationMethod ?? 'legacy_unknown';
     final source = (originSource != null && originSource.trim().isNotEmpty) ? originSource : null;
+    final directAndDefensible = strength == 'direct' &&
+        validation == 'passed' &&
+        source != null &&
+        evidenceLanguage == 'ne' &&
+        senseMatchMethod != null &&
+        defensibleSenseMatches.contains(senseMatchMethod);
 
     String code;
     if (publication == 'quarantined') {
@@ -65,7 +86,7 @@ class TranslationStatus {
       code = 'verified';
     } else if (validation == 'failed') {
       code = 'flagged';
-    } else if (strength == 'direct' && validation == 'passed' && source != null) {
+    } else if (directAndDefensible) {
       code = 'source_supported';
     } else if (method == 'llm' &&
         (strength == 'direct' || strength == 'strong') &&

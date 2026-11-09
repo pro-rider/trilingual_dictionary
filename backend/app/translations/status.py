@@ -1,30 +1,36 @@
 """Single source of truth for the label shown next to a Nepali meaning.
 
 The database stores dimensions, never labels. This function turns the stored
-dimensions into exactly one display state, deterministically, and the Dart twin
-in ``lib/core/translation_status.dart`` implements the same ladder. Both are
+dimensions into exactly one display state, deterministically; the Dart twin in
+``lib/core/translation_status.dart`` implements the same ladder, and both are
 checked against ``shared/translation_status_golden.json``.
 
-The ladder, in order — the first matching rule wins:
+The ladder, first match wins:
 
-1. ``publication_status == 'quarantined'``          → ``quarantined``  (hidden)
-2. ``human_verification == 'verified'``             → ``verified``
-3. ``validation_status == 'failed'``                → ``flagged``
-4. ``evidence_strength == 'direct'`` and validated and a source is named
-                                                    → ``source_supported``
-5. ``generation_method == 'llm'`` and evidence is direct/strong and validated
-                                                    → ``ai_checked``
-6. ``generation_method == 'llm'``                   → ``ai_unverified``
-7. ``generation_method == 'source_import'`` with direct/strong evidence
-   and validated                                     → ``source_sense_unconfirmed``
+1. ``publication_status == 'quarantined'``                 -> ``quarantined`` (hidden)
+2. ``human_verification == 'verified'``                    -> ``verified``
+3. ``validation_status == 'failed'``                       -> ``flagged``
+4. direct lexical Nepali evidence, defensible sense match, named source,
+   technical validation passed                             -> ``source_supported``
+5. ``generation_method == 'llm'`` + direct/strong evidence + passed
+                                                           -> ``ai_checked``
+6. ``generation_method == 'llm'``                          -> ``ai_unverified``
+7. ``generation_method == 'source_import'`` + direct/strong + passed
+                                                           -> ``source_sense_unconfirmed``
 8. ``generation_method == 'legacy_unknown'`` or validation incomplete
-                                                    → ``unverified_legacy``
-9. otherwise                                        → ``source_sense_unconfirmed``
+                                                           -> ``unverified_legacy``
+9. otherwise                                               -> ``source_sense_unconfirmed``
 
-Consequences worth stating out loud: a valid Devanagari string never becomes
-``verified``; ``validation_status == 'passed'`` only ever produces "checked",
-never "verified"; an old ``reviewed`` status is not human verification and now
-renders as unverified.
+Rule 4 is deliberately narrow. A source URL is not enough: the evidence has to
+be lexical Nepali (``evidence_language == 'ne'``), the sense correspondence has
+to be defensible (``sense_match_method`` in ``DEFENSIBLE_SENSE_MATCHES``), the
+source has to be named, and technical validation has to pass. Evidence found by
+headword alone, or by a heuristic, cannot make a value "source-supported" —
+that is what the "sense unconfirmed" label is for.
+
+Consequences stated plainly: no valid Devanagari string ever becomes
+``verified``; ``validation_status == 'passed'`` never yields more than
+"checked"; a legacy ``reviewed``/``verified`` status renders as unverified.
 """
 from __future__ import annotations
 
@@ -37,7 +43,7 @@ AI_UNVERIFIED = "ai_unverified"
 SOURCE_SENSE_UNCONFIRMED = "source_sense_unconfirmed"
 UNVERIFIED_LEGACY = "unverified_legacy"
 
-#: code -> (label, visible in normal results, needs source attribution)
+#: codes -> (label, visible in normal results, needs source attribution)
 RULES = {
     QUARANTINED: ("Hidden from results", False, False),
     VERIFIED: ("Verified", True, False),
@@ -49,13 +55,17 @@ RULES = {
     UNVERIFIED_LEGACY: ("Unverified — source unknown", True, False),
 }
 
+#: How the source record was tied to *this* sense. Only these count as
+#: defensible; ``headword``/``heuristic``/``None`` do not.
+DEFENSIBLE_SENSE_MATCHES = ("sense_gloss", "sense_id", "qid", "article")
+
 
 def derive(record):
-    """Return (code, label, visible, needs_attribution, attribution).
+    """Return a dict: code, label, visible, needs_attribution, attribution.
 
-    ``record`` may be a dict or any mapping with the dimension keys. Missing
-    keys fall back to the column defaults (``not_verified``, ``incomplete``,
-    ``labeled``), so an old row cannot accidentally read as verified.
+    ``record`` may be a mapping with the dimension keys. Missing keys fall back
+    to the column defaults (``not_verified``, ``incomplete``, ``labeled``), so
+    an old row cannot read as verified by accident.
     """
     publication = record.get("publication_status") or "labeled"
     verification = record.get("human_verification") or "not_verified"
@@ -63,6 +73,16 @@ def derive(record):
     strength = record.get("evidence_strength") or "none"
     method = record.get("generation_method") or "legacy_unknown"
     source = record.get("origin_source")
+    evidence_language = record.get("evidence_language")
+    sense_match = record.get("sense_match_method")
+
+    direct_and_defensible = (
+        strength == "direct"
+        and validation == "passed"
+        and bool(source)
+        and evidence_language == "ne"
+        and sense_match in DEFENSIBLE_SENSE_MATCHES
+    )
 
     if publication == "quarantined":
         code = QUARANTINED
@@ -70,7 +90,7 @@ def derive(record):
         code = VERIFIED
     elif validation == "failed":
         code = FLAGGED
-    elif strength == "direct" and validation == "passed" and source:
+    elif direct_and_defensible:
         code = SOURCE_SUPPORTED
     elif method == "llm" and strength in ("direct", "strong") and validation == "passed":
         code = AI_CHECKED

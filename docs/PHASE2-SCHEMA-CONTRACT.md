@@ -1,11 +1,30 @@
-# Phase 2 — schema contract (v2), governance decisions and freeze checklist
+# Phase 2 — schema contract (v3), governance decisions and freeze checklist
 
 Status: **implemented, not frozen** — waiting for your approval. Phase 3 and all
 large-scale translation have not started; no existing data was deleted, rewritten
 or hidden.
 
-Store: `backend/data/build/translations.db` (schema **2**, its own file, never
+Store: `backend/data/build/translations.db` (schema **3**, its own file, never
 inside `dictionary.sqlite`).
+
+> **Phase 2.1 delta (this revision).** Read `docs/PHASE2.1-CORRECTIONS.md` for
+> the full correction record. In short:
+> * the 3,245 legacy Nepali values are now imported into this store (batch
+>   `legacy-ne-20261109T085958Z`), verified value-by-value, reversible with
+>   `--rollback-batch`; `dictionary.sqlite` stays the authoritative original and
+>   was never written to;
+> * schema 3 adds `sense_match_method`, `evidence_language`, `import_batch`,
+>   `evidence.language`, the `translations_by_import_batch` index and the
+>   `verification_authority_role_is_human` trigger;
+> * “Source-supported” now requires direct **lexical Nepali** evidence with a
+>   **defensible sense match** (`sense_gloss`/`sense_id`/`qid`/`article`), not a
+>   source URL (golden vectors grew from 12 to 17);
+> * backup/restore verification is content-level (`content_fingerprint`), not
+>   row counts or file hashes;
+> * counts are reconciled with units and queries in `docs/PHASE2.1-COUNTS.md`;
+> * the `fts_zh` trigram index is 76 entries short (ids 123,597–123,672, including
+>   `一天`/`一年`) — latent today because no code path queries FTS, fixed at the
+>   next build via `tools/rebuild_fts.py`.
 
 ---
 

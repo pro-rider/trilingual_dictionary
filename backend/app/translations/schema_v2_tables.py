@@ -31,7 +31,7 @@ import shutil
 import sqlite3
 from datetime import datetime, timezone
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DB_FILENAME = "translations.db"
 
 LEGACY_STATUSES = ("verified", "reviewed", "ai_checked", "ai_unverified", "quarantined")
@@ -98,6 +98,9 @@ _TABLES_V2 = [
         origin_retrieved_at     text,
         origin_method           text,
         sense_match_confidence  real,
+        sense_match_method      text,           -- sense_gloss | sense_id | qid | article | headword | heuristic
+        evidence_language       text,           -- language code of the evidence used ('ne' for direct lexical)
+        import_batch            text,           -- batch id, so an import can be rolled back exactly
         evidence_ids            text,
         evidence_category       text check (evidence_category in ('A','B','C','D') or evidence_category is null),
         model_version           text,
@@ -227,6 +230,7 @@ _INDEXES_V2 = [
     "create index if not exists sense_hsk_by_level on sense_hsk(hsk_standard, hsk_level)",
     "create index if not exists event_log_by_time on event_log(occurred_at)",
     "create index if not exists quarantine_by_sense on quarantine_records(sense_key)",
+    "create index if not exists translations_by_import_batch on translations(import_batch)",
 ]
 
 _TRIGGERS_V2 = [
@@ -300,6 +304,26 @@ _TRIGGERS_V2 = [
         select raise(abort, 'a quarantine record must keep the original text');
     end
     """,
+    # A verification authority must be an identifiable human role. A pipeline
+    # identity cannot be inserted here at all.
+    """
+    create trigger if not exists verification_authority_role_is_human
+    before insert on verification_authorities
+    when lower(new.role) not in ('reviewer','admin')
+    begin
+        select raise(abort, 'verification authorities must have role reviewer or admin');
+    end
+    """,
+]
+
+#: Schema 2 -> 3: the columns that make an import traceable and a
+#: "source-supported" claim checkable. ``migrate`` applies these to a v2 store.
+_V3_ALTERS = [
+    "alter table translations add column sense_match_method text",
+    "alter table translations add column evidence_language text",
+    "alter table translations add column import_batch text",
+    "alter table evidence add column language text",
+    "create index if not exists translations_by_import_batch on translations(import_batch)",
 ]
 
 #: The exact version-1 schema, kept so a real v1 store and the migration test can

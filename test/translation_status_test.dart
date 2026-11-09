@@ -27,6 +27,8 @@ void main() {
         evidenceStrength: input['evidence_strength'] as String?,
         generationMethod: input['generation_method'] as String?,
         originSource: input['origin_source'] as String?,
+        evidenceLanguage: input['evidence_language'] as String?,
+        senseMatchMethod: input['sense_match_method'] as String?,
       );
       expect(status.code, expected['code'], reason: '${item['name']}: code');
       expect(status.label, expected['label'], reason: '${item['name']}: label');

@@ -29,6 +29,7 @@ from .schema_v2_tables import (  # noqa: F401  (re-exported for callers)
     _TABLES_V1,
     _TABLES_V2,
     _TRIGGERS_V2,
+    _V3_ALTERS,
 )
 
 DB_FILENAME = "translations.db"
@@ -67,6 +68,7 @@ _TABLES_SHARED = [
         license      text,
         license_url  text,
         snippet      text,
+        language     text,
         match_method text,
         match_score  real,
         fetched_at   text not null,
@@ -151,6 +153,46 @@ def snapshot(path):
         }
     finally:
         conn.close()
+
+
+def content_fingerprint(path):
+    """Deterministic content hash of every table, ordered by primary key.
+
+    Row counts alone cannot tell two different datasets apart. This hashes the
+    canonical text of every row (one line per row, ``\\x1e`` between fields,
+    ``\\x1d`` between rows) per table, so a backup can be compared by content:
+    equal fingerprints mean equal values, not just equal sizes. Page layout,
+    WAL state and file bytes are deliberately not part of the hash.
+    """
+    if not os.path.exists(path):
+        return None
+    conn = sqlite3.connect("file:%s?mode=ro" % path.replace("\\", "/"), uri=True)
+    try:
+        per_table = {}
+        for table in table_names(conn):
+            if table.startswith("sqlite_"):
+                continue
+            pk = [r[1] for r in conn.execute("pragma table_info(%s)" % table) if r[5]]
+            order = " order by " + ", ".join(pk) if pk else ""
+            chunk = hashlib.sha256()
+            rows = 0
+            for row in conn.execute("select * from %s%s" % (table, order)):
+                chunk.update("\x1e".join("" if v is None else str(v) for v in row).encode("utf-8"))
+                chunk.update(b"\x1d")
+                rows += 1
+            per_table[table] = {"rows": rows, "sha256": chunk.hexdigest()}
+        combined = hashlib.sha256(
+            "\n".join("%s|%s|%s" % (t, per_table[t]["rows"], per_table[t]["sha256"])
+                      for t in sorted(per_table)).encode("utf-8")
+        ).hexdigest()
+        return {"tables": per_table, "content_sha256": combined,
+                "integrity": integrity_check(conn)}
+    finally:
+        conn.close()
+
+
+def integrity_check(conn):
+    return conn.execute("pragma quick_check").fetchone()[0]
 
 
 def backup(path):
@@ -350,7 +392,7 @@ def migrate(path, dry_run=False, data_version=None):
                 _create_v2(conn)
                 conn.execute(
                     "insert or ignore into versions(component, version, content_hash, note, created_at) "
-                    "values('schema', ?, ?, 'schema 2: dimension fields, provenance, governance tables', ?)",
+                    "values('schema', ?, ?, 'schema 3: dimensions, provenance, governance, import batches', ?)",
                     (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
                 )
             elif report["from_version"] == 1:
@@ -371,8 +413,47 @@ def migrate(path, dry_run=False, data_version=None):
                     "values('schema', ?, ?, 'upgraded from schema 1', ?)",
                     (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
                 )
+            elif report["from_version"] == 2:
+                # Schema 2 -> 3: the import-batch and sense-match columns.
+                existing = [r[1] for r in conn.execute("pragma table_info(translations)")]
+                evidence_cols = [r[1] for r in conn.execute("pragma table_info(evidence)")]
+                for stmt in _V3_ALTERS:
+                    if "add column" in stmt:
+                        table = stmt.split("alter table")[1].split()[0]
+                        col = stmt.split("add column")[1].split()[0]
+                        if col in (existing if table == "translations" else evidence_cols):
+                            continue
+                    conn.execute(stmt)
+                for stmt in _TRIGGERS_V2:
+                    conn.execute(stmt)
+                for stmt in _INDEXES_V2:
+                    conn.execute(stmt)
+                conn.execute(
+                    "insert or ignore into versions(component, version, content_hash, note, created_at) "
+                    "values('schema', ?, ?, 'upgraded from schema 2: import batch, sense match method', ?)",
+                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
+                )
             else:
                 raise RuntimeError("no migration path from schema %s" % report["from_version"])
+            # Schema 2 -> 3: add the import/sense-match columns to an existing store.
+            if report["from_version"] == 2:
+                existing = [r[1] for r in conn.execute("pragma table_info(translations)")]
+                evidence_cols = [r[1] for r in conn.execute("pragma table_info(evidence)")]
+                for stmt in _V3_ALTERS:
+                    col = stmt.split("add column")[1].split()[0] if "add column" in stmt else None
+                    table = stmt.split("alter table")[1].split()[0] if "add column" in stmt else None
+                    if col:
+                        cols = existing if table == "translations" else evidence_cols
+                        if col in cols:
+                            continue
+                    conn.execute(stmt)
+                for stmt in _TRIGGERS_V2:
+                    conn.execute(stmt)
+                conn.execute(
+                    "insert or ignore into versions(component, version, content_hash, note, created_at) "
+                    "values('schema', ?, ?, 'upgraded from schema 2: import batch, sense match method', ?)",
+                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
+                )
             conn.execute("pragma user_version = %d" % SCHEMA_VERSION)
             if data_version:
                 conn.execute(
@@ -417,8 +498,13 @@ def rollback(path, backup_path, dry_run=False):
         if os.path.exists(side):
             os.remove(side)
     shutil.copy2(backup_path, path)
+    restored = content_fingerprint(path)
+    expected = content_fingerprint(backup_path)
     return {"restored": path, "from": backup_path, "previous_moved_to": aside,
-            "snapshot": snapshot(path)}
+            "snapshot": snapshot(path),
+            "content_matches_backup": restored == expected,
+            "content_sha256": restored["content_sha256"],
+            "integrity": restored["integrity"]}
 
 
 def _schema_hash():

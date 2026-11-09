@@ -114,9 +114,16 @@ def sha256_of(path):
     return h.hexdigest()
 
 
-def connect(path):
+def connect(path, timeout=0.0):
+    """Open the store with writes failing fast on a contended lock.
+
+    Single-writer decision: the store is written by one process at a time. A
+    second writer gets ``SQLITE_BUSY`` immediately instead of blocking for a
+    while and then succeeding at an unpredictable moment, which is what makes a
+    half-run import look successful. Callers that want to wait pass ``timeout``.
+    """
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=timeout)
     conn.execute("pragma foreign_keys = on")
     conn.execute("pragma journal_mode = wal")
     return conn
@@ -156,14 +163,42 @@ def snapshot(path):
         conn.close()
 
 
-def content_fingerprint(path):
-    """Deterministic content hash of every table, ordered by primary key.
+NULL_SENTINEL = "\x00NULL"
 
-    Row counts alone cannot tell two different datasets apart. This hashes the
-    canonical text of every row (one line per row, ``\\x1e`` between fields,
-    ``\\x1d`` between rows) per table, so a backup can be compared by content:
-    equal fingerprints mean equal values, not just equal sizes. Page layout,
-    WAL state and file bytes are deliberately not part of the hash.
+
+def _order_by(conn, table):
+    """Canonical ordering: the primary key, or every column when there is none.
+
+    A table without a primary key still orders by all of its columns, so the
+    hash does not depend on the physical row order SQLite happens to return —
+    otherwise two copies of the same content could hash differently.
+    """
+    info = list(conn.execute("pragma table_info(%s)" % table))
+    pk = [r[1] for r in info if r[5]]
+    if pk:
+        return " order by " + ", ".join(pk)
+    return " order by " + ", ".join(str(i + 1) for i in range(len(info)))
+
+
+def content_fingerprint(path):
+    """Deterministic content hash of every table (definition, verbatim).
+
+    * Scope: every user table; ``sqlite_*`` internal tables are excluded.
+    * Per row: every column value, in declared column order, is stringified with
+      ``str()``; ``None`` becomes ``\\x00NULL`` so NULL and ``''`` differ; fields
+      are joined with ``\\x1e`` and rows with ``\\x1d``.
+    * No normalisation: bytes are hashed exactly as stored (no Unicode NFC/NFKC,
+      no whitespace collapsing, no case folding), so a real value change always
+      changes the hash.
+    * Ordering: primary key when a table has one, otherwise every column.
+    * Per table: sha256 of that stream plus a row count.
+    * Combined: sha256 over ``table|rows|sha256`` for tables sorted by name, with
+      ``user_version`` prefixed — a schema bump is therefore visible.
+    * Excluded on purpose: page layout, WAL state, ``rowid`` (when not a declared
+      column), file bytes, and free-page contents. Copying a database can change
+      all of those while the logical content stays identical.
+
+    Used to prove a rollback or a restore restored the previous *content*.
     """
     if not os.path.exists(path):
         return None
@@ -173,19 +208,18 @@ def content_fingerprint(path):
         for table in table_names(conn):
             if table.startswith("sqlite_"):
                 continue
-            pk = [r[1] for r in conn.execute("pragma table_info(%s)" % table) if r[5]]
-            order = " order by " + ", ".join(pk) if pk else ""
             chunk = hashlib.sha256()
             rows = 0
-            for row in conn.execute("select * from %s%s" % (table, order)):
-                chunk.update("\x1e".join("" if v is None else str(v) for v in row).encode("utf-8"))
+            for row in conn.execute("select * from %s%s" % (table, _order_by(conn, table))):
+                chunk.update("\x1e".join(
+                    NULL_SENTINEL if v is None else str(v) for v in row).encode("utf-8"))
                 chunk.update(b"\x1d")
                 rows += 1
             per_table[table] = {"rows": rows, "sha256": chunk.hexdigest()}
-        combined = hashlib.sha256(
-            "\n".join("%s|%s|%s" % (t, per_table[t]["rows"], per_table[t]["sha256"])
-                      for t in sorted(per_table)).encode("utf-8")
-        ).hexdigest()
+        combined = hashlib.sha256(("\n".join(
+            ["v%d" % user_version(conn)] +
+            ["%s|%s|%s" % (t, per_table[t]["rows"], per_table[t]["sha256"])
+             for t in sorted(per_table)])).encode("utf-8")).hexdigest()
         return {"tables": per_table, "content_sha256": combined,
                 "integrity": integrity_check(conn)}
     finally:

@@ -125,3 +125,24 @@ unchanged by the rehearsal, the Python and Dart sides are pinned to one committe
 24+8 vector contract, and every mandatory gate fails loudly with a non-zero exit.
 
 Not frozen. Not started: Phase 1.5, Phase 3, schema freeze, any new translation.
+
+## Revision 2 — after review (execution-governance round)
+
+Changes made in response to the review, with their evidence:
+
+| review point | what changed | evidence |
+| --- | --- | --- |
+| fingerprint method was vague | one written definition; ordering falls back to **all** columns when a table has no PK; `None` gets `\x00NULL` so NULL ≠ `''`; `user_version` enters the combined hash | `schema.content_fingerprint` docstring, `tools/fingerprint.py`, `tests/test_fingerprint_contract.py` (5 passed) |
+| FTS config must be pointed at, not invented | §1 of the execution contract names `FTS_SCHEMA`, `validate_fts.py`, and forbids new tokenizers | `docs/PHASE2.1-EXECUTION-CONTRACT.md` |
+| investigation→proposal needs a hard stop | contract step 2 must end the turn and quote the approval before any mutation | §2 of the contract |
+| issue register should not bloat | register lists open items only, with severity/gate/evidence | `docs/ISSUE-REGISTER.md` (11 open) |
+| latin_mix had no decision rule | deterministic classifier: five verdicts, one quarantine-justified | `app/translations/script_mix.py`, `tests/test_script_mix_rule.py` (10 passed) |
+| "7 corrupted" was a screening count | real data: **5** `intra_token_mix` (senses 59001, 66092, 112935, 112963, 170710) + **2** `foreign_token` (5090, 49650) | `tools/classify_script_mix.py` read-only run |
+| asset replacement needs an absolute gate | local rebuild success is never sufficient; report → approval → separate commit | §5 of the contract |
+| concurrency "could be deferred" | decided and tested: single-writer, `timeout=0`, second writer rejected, no partial batch | `tests/test_concurrent_writers.py` (2 passed) |
+
+Re-measured after the fingerprint change: rehearsal `ok: true`, content
+`838b6b6f…`, dictionary sha `3f9e5f46…f171f3` unchanged, store sha `2a6e4284…6cf036`
+unchanged. Backend suite: **168 passed, 0 failed**. Dart suite unchanged at
+**57 passed** (no Dart file touched in this round).
+

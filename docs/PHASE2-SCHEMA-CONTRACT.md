@@ -455,3 +455,49 @@ Note: fts5 trigram cannot match 1–2 character queries (`的`, `水`, `一天` 
 hits by design), so such a miss is not evidence of a defect; the exact-ID set is
 the integrity signal.
 
+### 13.8 Content fingerprint — the one definition
+
+`content_fingerprint()` (and `tools/fingerprint.py`): every user table
+(`sqlite_*` excluded); every column in declared order; `str()` values with
+`None → \x00NULL`; `\x1e` between fields, `\x1d` between rows; ordering by
+primary key when present, otherwise by **all** columns (so a table without a PK
+still hashes deterministically); per-table sha256 + row count; combined sha256
+over `v<user_version>` and `table|rows|sha` sorted by table name.
+
+None of the following is normalised: Unicode form, whitespace, case, numeric
+formatting. `rowid`, page layout, WAL state and file bytes are excluded. A
+fingerprint therefore proves *equal values*, never a recoverable file — that is
+`backup()`'s job — and the two must be reported separately. Contract tests:
+`backend/tests/test_fingerprint_contract.py`.
+
+### 13.9 Concurrency — single-writer, fail fast
+
+`schema.connect(path, timeout=0.0)` opens with a zero wait, and writes begin with
+`BEGIN IMMEDIATE`. A second writer gets `SQLITE_BUSY` at once rather than
+blocking and later succeeding mid-run. Callers that genuinely want to wait pass
+`timeout` explicitly; the importer does not. Concurrent writers are **rejected**,
+not serialised — that is the supported model, tested in
+`backend/tests/test_concurrent_writers.py` (lock rejection + no partial batch).
+
+### 13.10 Script-mix decision rule
+
+`app/translations/script_mix.py` is the only classifier. `intra_token_mix`
+(Latin/Cyrillic letters inside a Devanagari word) is the only quarantine-justified
+verdict; `foreign_token` (a pure Latin token beside Devanagari, e.g. `C`,
+`Zhuge Liang`) stays visible; `no_devanagari` is escalated, never auto-quarantined.
+
+Measured on the shipped dictionary (`tools/classify_script_mix.py`, read-only):
+7 values contain Latin/Cyrillic letters — 5 `intra_token_mix`
+(senses 59001, 66092, 112935, 112963, 170710) and 2 `foreign_token` (senses 5090,
+49650). The earlier "7 corrupted values" figure was a screening count; the
+decision rule narrows it to 5, and none of the 7 may be deleted — the originals
+must survive any future quarantine.
+
+### 13.11 Executable governance
+
+The rules above are enforced, not advisory: see
+`docs/PHASE2.1-EXECUTION-CONTRACT.md` (hard stop after proposal, scope protection,
+asset-replacement gate, acceptance and rejection criteria) and
+`docs/ISSUE-REGISTER.md` (open items with severity, gate and evidence).
+
+

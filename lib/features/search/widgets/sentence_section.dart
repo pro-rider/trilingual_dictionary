@@ -35,13 +35,19 @@ class SentenceSection extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                example.reviewStatus == 'approved' ? '✓ reviewed' : 'draft',
+                switch (example.reviewStatus) {
+                  'approved' => '✓ reviewed',
+                  'ai_generated' => 'AI · unverified',
+                  _ => 'draft',
+                },
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: example.reviewStatus == 'approved'
-                      ? const Color(0xFF166534)
-                      : const Color(0xFFB45309),
+                  color: switch (example.reviewStatus) {
+                    'approved' => const Color(0xFF166534),
+                    'ai_generated' => const Color(0xFFB45309),
+                    _ => const Color(0xFFB45309),
+                  },
                 ),
               ),
             ],

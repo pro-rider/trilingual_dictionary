@@ -72,6 +72,16 @@ flutter analyze lib test          No issues found
 Both tests run against the real 96 MB database, so they need
 `sqfliteFfiInit(); databaseFactory = databaseFactoryFfi;`.
 
+## User data (G1)
+
+Favorites, history and settings live in `SharedPreferences`; AI glosses and AI
+example sentences used to be written into `dictionary.sqlite`, which is replaced
+on every `assetVersion` bump. They now live in `user.db`
+(`lib/data/local/user_store.dart`), keyed by a stable sense key
+(`simplified + pinyin + gloss_en`), overlaid on the dictionary at read time,
+versioned with a backup before every migration, and exportable/importable as
+JSON. See `docs/G1-USER-DATA.md`; road map in `docs/ROADMAP.md`.
+
 ## Not done yet
 
 * Image coverage: 204 of 123,672 words. Frequency-ordered bulk fetching was

@@ -13,6 +13,7 @@ import '../models/analyzed_text.dart';
 import '../models/dictionary_entry.dart';
 import '../models/example_sentence.dart';
 import '../models/sense.dart';
+import 'user_store.dart';
 
 /// One approved image for an entry, as stored inside the bundled database.
 ///
@@ -55,20 +56,38 @@ class OfflineDictionary {
   static const String fileName = 'dictionary.sqlite';
 
   /// Bump this whenever `assets/data/dictionary.sqlite.gz` is rebuilt. The
-  /// phone keeps its own copy of the database (it writes Nepali glosses and
-  /// example sentences into it), so a plain "file exists" check would silently
-  /// keep serving the old words forever.
+  /// phone keeps its own copy of the database, so a plain "file exists" check
+  /// would silently keep serving the old words forever.
+  ///
+  /// Nothing the user owns is written into this file: AI glosses and AI example
+  /// sentences live in [UserStore] (`user.db`), which this replacement never
+  /// touches.
   static const String assetVersion = '2026-11-09.3';
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.
   final String? overridePath;
 
+  /// Where AI results and other user-owned rows go. Created on first use.
+  UserStore? _store;
+  final UserStore? _storeOverride;
+
   Database? _db;
   Future<Database?>? _opening;
   Object? _lastError;
 
-  OfflineDictionary({this.overridePath});
+  OfflineDictionary({this.overridePath, UserStore? userStore})
+      : _storeOverride = userStore;
+
+  UserStore get userStore => _store ??= (_storeOverride ?? UserStore());
+
+  /// Stable key for a sense, so saved data survives a rebuilt dictionary.
+  static String senseKey({
+    required String wordZh,
+    required String pinyin,
+    required String glossEn,
+  }) =>
+      UserStore.senseKey(wordZh: wordZh, pinyin: pinyin, glossEn: glossEn);
 
   /// Whether the on-disk database is present and current (no import needed).
   Future<bool> get isInstalled async {
@@ -91,8 +110,9 @@ class OfflineDictionary {
       final file = await _dbFile();
       if (!(await _isCurrentVersion(file))) {
         // Stale or missing copy: replace it with the version shipped in the
-        // APK. Any enrichment done against the old file is re-fetched on the
-        // next online lookup.
+        // APK. AI glosses and examples are in `user.db` (see [UserStore]) and
+        // are applied on top of this file, so a swap loses nothing the user
+        // paid for.
         if (file.existsSync()) {
           try {
             file.deleteSync();
@@ -338,6 +358,19 @@ class OfflineDictionary {
             where: 'sense_id IN (${List.filled(senseIds.length, '?').join(',')})',
             whereArgs: senseIds);
 
+    // AI results live in `user.db`, keyed by the stable sense key, and are
+    // overlaid here. They survive every dictionary rebuild.
+    final senseKeys = <int, String>{
+      for (final s in rows)
+        (s['sense_id'] as int? ?? -1): senseKey(
+          wordZh: simplified,
+          pinyin: pinyin,
+          glossEn: (s['gloss_en'] as String?) ?? '',
+        ),
+    };
+    final overlayGlosses = await userStore.aiGlosses(senseKeys.values);
+    final overlayExamples = await userStore.aiExamples(senseKeys.values);
+
     final examplesBySense = <int, List<ExampleSentence>>{};
     for (final ex in exampleRows) {
       final en = (ex['en'] as String?) ?? '';
@@ -365,11 +398,38 @@ class OfflineDictionary {
           ));
     }
 
+    // A sense with no sentence of its own falls back to the AI one the user
+    // already fetched (stored in user.db), labelled honestly.
+    for (final e in senseKeys.entries) {
+      if (examplesBySense[e.key]?.isNotEmpty ?? false) continue;
+      final ai = overlayExamples[e.value];
+      if (ai == null || ai.en.trim().isEmpty) continue;
+      if (_hasForeignScript(ai.zh) ||
+          (ai.ne.isNotEmpty && !_isDevanagari(ai.ne))) {
+        continue;
+      }
+      examplesBySense[e.key] = [
+        ExampleSentence(
+          en: ai.en,
+          zh: ai.zh,
+          ne: ai.ne,
+          source: 'ai_generated',
+          reviewStatus: 'ai_generated',
+        ),
+      ];
+    }
+
     final senseModels = rows.map((s) {
       final gloss = (s['gloss_en'] as String?) ?? '';
       // CC-CEDICT ships no Chinese gloss; the pink 中文 box used to render
       // empty. The headword itself is what a Chinese reader wants there.
-      final zh = ((s['gloss_zh'] as String?) ?? '').trim();
+      final dictZh = ((s['gloss_zh'] as String?) ?? '').trim();
+      final key = senseKeys[(s['sense_id'] as int?) ?? -1];
+      final ai = key == null ? null : overlayGlosses[key];
+      final dictNe = ((s['gloss_ne'] as String?) ?? '').trim();
+      final effectiveNe = dictNe.isNotEmpty ? dictNe : (ai?.ne ?? '');
+      final effectiveZh = dictZh.isNotEmpty ? dictZh : (ai?.zh ?? '');
+      final reviewed = (s['ne_status'] as String?) == 'reviewed';
       return Sense(
         id: '$entryId:${s['sense_order']}',
         wordEn: _shortGloss(gloss),
@@ -378,10 +438,13 @@ class OfflineDictionary {
         ipaEn: '',
         pos: '',
         meaningEn: gloss,
-        meaningZh: zh.isEmpty ? simplified : zh,
-        meaningNe: (s['gloss_ne'] as String?) ?? '',
+        meaningZh: effectiveZh.isEmpty ? simplified : effectiveZh,
+        meaningNe: effectiveNe,
         meaningNeStatus:
-            (s['ne_status'] as String?) == 'reviewed' ? 'published' : 'pending',
+            reviewed ? 'published' : (effectiveNe.isEmpty ? 'missing' : 'pending'),
+        meaningNeSource: dictNe.isNotEmpty
+            ? 'dictionary'
+            : (ai != null && ai.ne.isNotEmpty ? 'ai_translated' : 'none'),
         examples: examplesBySense[(s['sense_id'] as int?) ?? -1] ?? const [],
       );
     }).toList();
@@ -602,6 +665,11 @@ class OfflineDictionary {
             (row['gloss_en'] as String?) ??
             '')
         .trim();
+    // A Nepali/Chinese gloss fetched earlier from the server lives in user.db,
+    // not in the dictionary file, so it must be overlaid here too.
+    final ai = await _aiGlossFor(zh, row, sense);
+    final dictNe = ((sense?['gloss_ne'] as String?) ?? '').trim();
+    final dictZh = ((sense?['gloss_zh'] as String?) ?? '').trim();
     return AnalyzedSegment(
       surface: surface,
       kind: 'word',
@@ -612,10 +680,27 @@ class OfflineDictionary {
           ''),
       pos: ((row['pos_primary'] as String?) ?? ''),
       meaningEn: gloss,
-      meaningZh: ((sense?['gloss_zh'] as String?) ?? zh),
-      meaningNe: ((sense?['gloss_ne'] as String?) ?? ''),
+      meaningZh: dictZh.isNotEmpty ? dictZh : (ai?.zh ?? zh),
+      meaningNe: dictNe.isNotEmpty ? dictNe : (ai?.ne ?? ''),
       source: 'dataset',
     );
+  }
+
+  /// The AI gloss this device already fetched for the sense, if any.
+  Future<AiGloss?> _aiGlossFor(
+    String wordZh,
+    Map<String, Object?> entryRow,
+    Map<String, Object?>? senseRow,
+  ) async {
+    if (senseRow == null) return null;
+    final key = senseKey(
+      wordZh: wordZh,
+      pinyin: ((entryRow['pinyin_marked'] as String?) ??
+          (entryRow['pinyin_plain'] as String?) ??
+          ''),
+      glossEn: ((senseRow['gloss_en'] as String?) ?? ''),
+    );
+    return userStore.aiGloss(key);
   }
 
   static final Set<String> _stopWords = {
@@ -744,7 +829,12 @@ class OfflineDictionary {
   }
 
   /// Fill this entry's missing Nepali glosses and example sentences from the
-  /// backend and persist them in the on-device database.
+  /// backend and persist them in the **user database** (see [UserStore]).
+  ///
+  /// These rows used to be written into `dictionary.sqlite`, which is replaced
+  /// wholesale on every `assetVersion` bump — so a user's paid AI translations
+  /// silently disappeared on update. They now live in `user.db`, keyed by the
+  /// stable sense key, and are overlaid on the dictionary when a word is read.
   ///
   /// Only the senses that are actually empty are sent, so a repeat lookup
   /// costs nothing and works offline afterwards.
@@ -779,35 +869,44 @@ class OfflineDictionary {
     final payload = await api.enrich(items);
     if (payload.isEmpty) return entry;
 
+    final pinyin = entry.senses.isEmpty ? '' : entry.senses.first.pinyin;
     for (final item in items) {
       final sid = int.tryParse(item.key.substring(1));
       final data = payload[item.key];
       if (sid == null || data == null) continue;
+      final row = rows.firstWhere((r) => r['sense_id'] == sid,
+          orElse: () => const <String, Object?>{});
+      final key = senseKey(
+        wordZh: entry.wordZh,
+        pinyin: pinyin,
+        glossEn: (row['gloss_en'] as String?) ?? '',
+      );
       final ne = (data['ne'] ?? '').trim();
-      if (ne.isNotEmpty) {
-        await db.update('senses', {'gloss_ne': ne, 'ne_status': 'ai_translated'},
-            where: 'sense_id = ?', whereArgs: [sid]);
-      }
       final zh = (data['zh'] ?? '').trim();
-      if (zh.isNotEmpty) {
-        await db.update('senses', {'gloss_zh': zh},
-            where: 'sense_id = ?', whereArgs: [sid]);
+      if (ne.isNotEmpty || zh.isNotEmpty) {
+        await userStore.putAiGloss(
+          key,
+          ne: ne,
+          zh: zh,
+          status: 'ai_translated',
+          model: (data['model'] ?? '').toString(),
+        );
       }
       final exampleEn = (data['example_en'] ?? '').trim();
       if (exampleEn.isNotEmpty && !withExample.contains(sid)) {
-        await db.insert('examples', {
-          'sense_id': sid,
-          'en': exampleEn,
-          'zh': data['example_zh'] ?? '',
-          'ne': data['example_ne'] ?? '',
-        });
+        await userStore.putAiExample(
+          key,
+          en: exampleEn,
+          zh: (data['example_zh'] ?? '').toString(),
+          ne: (data['example_ne'] ?? '').toString(),
+        );
         withExample.add(sid);
       }
     }
     return _toEntry(db, {
       'entry_id': pk,
       'simplified': entry.wordZh,
-      'pinyin_marked': entry.senses.isEmpty ? '' : entry.senses.first.pinyin,
+      'pinyin_marked': pinyin,
     });
   }
 

@@ -29,9 +29,13 @@ import hashlib
 import json
 import shutil
 import sqlite3
+import sys
 import time
 import unicodedata
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_fts  # noqa: E402  (exact-ID FTS gate, shared with the builder)
 
 DDL = {
     "staging_entries": """
@@ -282,6 +286,15 @@ def main() -> int:
         print(f"promoted: {added_e} entries, {added_s} senses · version → {version}")
         print(f"backup kept at {bk}")
         con.close()
+        # A promotion is not shippable until both indexes cover every entry. Any
+        # entry inserted above without an index row would silently vanish from
+        # search — exactly the defect that shipped 76 missing fts_zh rows.
+        fts = validate_fts.check(str(db))
+        print(json.dumps(fts, indent=2, ensure_ascii=False))
+        if not fts["ok"]:
+            print("r5 promotion left the search index incomplete: %s"
+                  % "; ".join(fts["failures"]), file=sys.stderr)
+            return 1
         return 0
 
     summary = {

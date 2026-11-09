@@ -43,6 +43,9 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_fts  # noqa: E402  (release gate: exact FTS entry-id coverage)
+
 # --------------------------------------------------------------------------- #
 # Pinyin
 # --------------------------------------------------------------------------- #
@@ -410,6 +413,13 @@ CREATE VIRTUAL TABLE fts USING fts5(
 );
 """
 
+#: An entry's searchable English text: its glosses, in sense order. Both indexes
+#: use this one expression so they cannot drift apart.
+_ENTRY_ENGLISH = (
+    "(select group_concat(gloss_en, ' ') from (select gloss_en from senses "
+    "where senses.entry_id = entries.entry_id order by sense_order))"
+)
+
 
 def build(entries: list[Entry], source_meta: dict, out_path: Path) -> dict:
     if out_path.exists():
@@ -426,9 +436,13 @@ def build(entries: list[Entry], source_meta: dict, out_path: Path) -> dict:
             "english, entry_id UNINDEXED, tokenize = 'trigram')"
         )
         has_trigram = True
-    except sqlite3.OperationalError:
-        # Trigram tokenizer not compiled in: unicode61 FTS + LIKE still work.
-        has_trigram = False
+    except sqlite3.OperationalError as exc:
+        # A missing trigram tokenizer used to be a silent downgrade; it is a
+        # release blocker now, because the Chinese index would be empty and the
+        # 76-row defect shipped once already.
+        con.close()
+        raise SystemExit("trigram tokenizer unavailable, refusing to build a "
+                         "dictionary without a Chinese index: %s" % exc)
 
     con.executescript(FTS_SCHEMA)
 
@@ -497,25 +511,18 @@ def build(entries: list[Entry], source_meta: dict, out_path: Path) -> dict:
                 (entry_id, cl),
             )
 
-        english = " ".join(glosses)
-        con.execute(
-            "INSERT INTO fts(simplified, traditional, pinyin_search, english, "
-            "category, entry_id) VALUES (?,?,?,?,?,?)",
-            (
-                entry.simplified,
-                entry.traditional,
-                pinyin_search_variants(entry.pinyin_plain),
-                english,
-                category,
-                entry_id,
-            ),
-        )
-        if has_trigram:
-            con.execute(
-                "INSERT INTO fts_zh(simplified, traditional, english, entry_id) "
-                "VALUES (?,?,?,?)",
-                (entry.simplified, entry.traditional, english, entry_id),
-            )
+    # FTS is generated once, last, from the finished tables — never row by row
+    # inside the import loop. That ordering is what keeps an index from falling
+    # short of `entries` when a later step adds or reshapes rows.
+    con.execute("DELETE FROM fts")
+    con.execute(
+        "INSERT INTO fts(simplified, traditional, pinyin_search, english, category, entry_id) "
+        "SELECT simplified, traditional, pinyin_search, %s, category, entry_id FROM entries"
+        % _ENTRY_ENGLISH)
+    con.execute("DELETE FROM fts_zh")
+    con.execute(
+        "INSERT INTO fts_zh(simplified, traditional, english, entry_id) "
+        "SELECT simplified, traditional, %s, entry_id FROM entries" % _ENTRY_ENGLISH)
 
     con.executemany(
         "INSERT INTO meta(key, value) VALUES (?,?)",
@@ -694,6 +701,17 @@ def main(argv: list[str] | None = None) -> int:
     report["size_mb"] = round(report["size_bytes"] / (1024 * 1024), 2)
     report["samples"] = sample_queries(Path(args.out))
     report["nepali_estimate"] = nepali_cost_estimate(Path(args.out))
+
+    # Release gate: the artifact is only usable if both indexes cover every entry
+    # id exactly. On failure the artifact is removed — a build must never leave a
+    # shippable dictionary behind with a hole in its search index.
+    fts = validate_fts.check(args.out)
+    report["fts"] = fts
+    if not fts["ok"]:
+        Path(args.out).unlink(missing_ok=True)
+        print("FTS validation failed, artifact discarded: %s" % "; ".join(fts["failures"]),
+              file=sys.stderr)
+        return 1
 
     report_path = Path(args.out).with_suffix(".report.json")
     report_path.write_text(

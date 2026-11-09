@@ -31,7 +31,7 @@ import shutil
 import sqlite3
 from datetime import datetime, timezone
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 DB_FILENAME = "translations.db"
 
 LEGACY_STATUSES = ("verified", "reviewed", "ai_checked", "ai_unverified", "quarantined")
@@ -312,6 +312,58 @@ _TRIGGERS_V2 = [
     when lower(new.role) not in ('reviewer','admin')
     begin
         select raise(abort, 'verification authorities must have role reviewer or admin');
+    end
+    """,
+]
+
+#: Schema 3 -> 4: supersession integrity. A chain is linear by construction:
+#: translation ids are monotonic, so a new row can only point at an older one
+#: (no cycle is possible), and the leaf guard stops a second successor from
+#: branching it. A successor must stay inside the same sense and language, and a
+#: verified row can only be superseded by another verified row.
+_V4_TRIGGERS = [
+    """
+    create trigger if not exists translations_supersede_verified_needs_review
+    before insert on translations
+    when new.supersedes_id is not null
+      and exists (select 1 from translations p
+                  where p.translation_id = new.supersedes_id
+                    and p.human_verification = 'verified')
+      and new.human_verification <> 'verified'
+    begin
+        select raise(abort, 'a verified translation can only be superseded by a verified one');
+    end
+    """,
+    # One successor per row: the old row must still be the leaf of its chain.
+    """
+    create trigger if not exists translations_supersede_must_target_leaf
+    before insert on translations
+    when new.supersedes_id is not null
+      and exists (select 1 from translations s where s.supersedes_id = new.supersedes_id)
+    begin
+        select raise(abort, 'that translation already has a successor; supersede the leaf instead');
+    end
+    """,
+    # A correction may not jump to another sense or another language.
+    """
+    create trigger if not exists translations_supersede_must_stay_in_sense
+    before insert on translations
+    when new.supersedes_id is not null
+      and exists (select 1 from translations p
+                  where p.translation_id = new.supersedes_id
+                    and (p.sense_key <> new.sense_key or p.language <> new.language))
+    begin
+        select raise(abort, 'a successor must keep the same sense_key and language');
+    end
+    """,
+    # The target has to exist at all.
+    """
+    create trigger if not exists translations_supersede_target_exists
+    before insert on translations
+    when new.supersedes_id is not null
+      and not exists (select 1 from translations p where p.translation_id = new.supersedes_id)
+    begin
+        select raise(abort, 'supersedes_id does not name an existing translation');
     end
     """,
 ]

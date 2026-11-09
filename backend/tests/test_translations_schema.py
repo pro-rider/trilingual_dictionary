@@ -57,12 +57,12 @@ def _authorize(conn):
     return conn.execute("select authority_id from verification_authorities").fetchone()[0]
 
 
-def test_fresh_store_is_schema_2_with_governance_tables(tmp_path):
+def test_fresh_store_is_at_the_current_schema_with_governance_tables(tmp_path):
     db = str(tmp_path / schema.DB_FILENAME)
     report = schema.migrate(db)
-    assert report["to_version"] == 3
+    assert report["to_version"] == schema.SCHEMA_VERSION
     conn = sqlite3.connect(db)
-    assert schema.user_version(conn) == 3
+    assert schema.user_version(conn) == schema.SCHEMA_VERSION
     tables = schema.table_names(conn)
     for name in ("translations", "evidence", "versions", "id_map", "verification_authorities",
                  "sense_pos", "sense_hsk", "entry_aliases", "sense_aliases",

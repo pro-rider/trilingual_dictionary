@@ -1,27 +1,10 @@
-/// Dart twin of `backend/app/translations/status.py`.
-///
-/// The database stores dimensions, never labels. This turns the stored
-/// dimensions into one display state, with the same ladder as the backend so a
-/// badge in the app and a line in a report never disagree.
-///
-/// Ladder (first match wins):
-/// 1. quarantined                     -> hidden
-/// 2. human verified                  -> "Verified"
-/// 3. validation failed               -> "Flagged — failed checks"
-/// 4. direct evidence + validated + named source -> "Source-supported · <source>"
-/// 5. llm + direct/strong evidence + validated   -> "AI-translated, checked"
-/// 6. llm                             -> "AI-translated, unverified"
-/// 7. source_import + direct/strong + validated  -> "Source-recorded, sense unconfirmed"
-/// 8. legacy_unknown or incomplete validation    -> "Unverified — source unknown"
-/// 9. otherwise                        -> "Source-recorded, sense unconfirmed"
-///
-/// Consequences: a valid Devanagari string never becomes "Verified";
-/// `validationStatus == 'passed'` only ever yields "checked"; a legacy
-/// "reviewed" status renders as unverified.
-library;
-
 import 'package:flutter/foundation.dart';
 
+/// The derived display state of one Nepali meaning.
+///
+/// The database stores dimensions, never labels; this is the only place a label
+/// is produced. Mirrors `backend/app/translations/status.py`, and both are
+/// checked against `shared/translation_status_golden.json`.
 @immutable
 class TranslationStatus {
   const TranslationStatus({
@@ -40,22 +23,40 @@ class TranslationStatus {
     'article',
   ];
 
+  static const String quarantined = 'quarantined';
+  static const String superseded = 'superseded';
+  static const String verified = 'verified';
+  static const String flagged = 'flagged';
+  static const String userCorrection = 'user_correction';
+  static const String sourceSupported = 'source_supported';
+  static const String aiChecked = 'ai_checked';
+  static const String aiUnverified = 'ai_unverified';
+  static const String sourceSenseUnconfirmed = 'source_sense_unconfirmed';
+  static const String unverifiedLegacy = 'unverified_legacy';
+
   final String code;
   final String label;
-
-  /// Whether this row may appear in normal dictionary results.
   final bool visible;
-
-  /// Source name when the label must carry attribution, else null.
   final String? attribution;
 
-  /// The shared ladder. Missing dimensions fall back to the database defaults
-  /// (`not_verified`, `incomplete`, `labeled`), so an old row cannot read as
-  /// verified by accident.
+  /// The ladder, first match wins — the order is part of the contract.
   ///
-  /// "Source-supported" is deliberately narrow: a source URL alone is not
-  /// enough, the evidence must be lexical Nepali and the sense match defensible
-  /// (see [defensibleSenseMatches]).
+  /// 1. quarantined -> hidden
+  /// 2. has a successor -> superseded, hidden but keeps attribution
+  /// 3. human verified -> verified
+  /// 4. validation failed -> flagged
+  /// 5. origin_method user_correction -> user correction, awaiting verification
+  /// 6. imported from a source + direct Nepali lexical evidence + defensible
+  ///    sense match + named source + passed -> source-supported
+  /// 7. llm + direct/strong + passed -> AI-translated, checked
+  /// 8. llm -> AI-translated, unverified
+  /// 9. source import + direct/strong + passed -> source recorded, sense unconfirmed
+  /// 10. legacy unknown or incomplete validation -> unverified (source unknown)
+  /// 11. otherwise -> source recorded, sense unconfirmed
+  ///
+  /// Rule 6 requires `generation_method == 'source_import'`: an LLM-written value
+  /// becomes *checked*, never *source-supported*, however good the evidence for
+  /// the sense is. A source URL alone is never enough.
   factory TranslationStatus.derive({
     String? publicationStatus,
     String? humanVerification,
@@ -63,8 +64,10 @@ class TranslationStatus {
     String? evidenceStrength,
     String? generationMethod,
     String? originSource,
+    String? originMethod,
     String? evidenceLanguage,
     String? senseMatchMethod,
+    bool hasSuccessor = false,
   }) {
     final publication = publicationStatus ?? 'labeled';
     final verification = humanVerification ?? 'not_verified';
@@ -72,7 +75,8 @@ class TranslationStatus {
     final strength = evidenceStrength ?? 'none';
     final method = generationMethod ?? 'legacy_unknown';
     final source = (originSource != null && originSource.trim().isNotEmpty) ? originSource : null;
-    final directAndDefensible = strength == 'direct' &&
+    final directAndDefensible = method == 'source_import' &&
+        strength == 'direct' &&
         validation == 'passed' &&
         source != null &&
         evidenceLanguage == 'ne' &&
@@ -81,80 +85,59 @@ class TranslationStatus {
 
     String code;
     if (publication == 'quarantined') {
-      code = 'quarantined';
+      code = quarantined;
+    } else if (hasSuccessor) {
+      code = superseded;
     } else if (verification == 'verified') {
-      code = 'verified';
+      code = TranslationStatus.verified;
     } else if (validation == 'failed') {
-      code = 'flagged';
+      code = flagged;
+    } else if (originMethod == 'user_correction') {
+      code = userCorrection;
     } else if (directAndDefensible) {
-      code = 'source_supported';
+      code = sourceSupported;
     } else if (method == 'llm' &&
         (strength == 'direct' || strength == 'strong') &&
         validation == 'passed') {
-      code = 'ai_checked';
+      code = aiChecked;
     } else if (method == 'llm') {
-      code = 'ai_unverified';
+      code = aiUnverified;
     } else if (method == 'source_import' &&
         (strength == 'direct' || strength == 'strong') &&
         validation == 'passed') {
-      code = 'source_sense_unconfirmed';
+      code = sourceSenseUnconfirmed;
     } else if (method == 'legacy_unknown' || validation == 'incomplete') {
-      code = 'unverified_legacy';
+      code = unverifiedLegacy;
     } else {
-      code = 'source_sense_unconfirmed';
+      code = sourceSenseUnconfirmed;
     }
 
-    final String baseLabel;
-    final bool visible;
-    final bool needsAttribution;
-    switch (code) {
-      case 'quarantined':
-        baseLabel = 'Hidden from results';
-        visible = false;
-        needsAttribution = false;
-        break;
-      case 'verified':
-        baseLabel = 'Verified';
-        visible = true;
-        needsAttribution = false;
-        break;
-      case 'flagged':
-        baseLabel = 'Flagged — failed checks';
-        visible = true;
-        needsAttribution = false;
-        break;
-      case 'source_supported':
-        baseLabel = 'Source-supported';
-        visible = true;
-        needsAttribution = true;
-        break;
-      case 'ai_checked':
-        baseLabel = 'AI-translated, checked';
-        visible = true;
-        needsAttribution = false;
-        break;
-      case 'ai_unverified':
-        baseLabel = 'AI-translated, unverified';
-        visible = true;
-        needsAttribution = false;
-        break;
-      case 'source_sense_unconfirmed':
-        baseLabel = 'Source-recorded, sense unconfirmed';
-        visible = true;
-        needsAttribution = true;
-        break;
-      default:
-        baseLabel = 'Unverified — source unknown';
-        visible = true;
-        needsAttribution = false;
-    }
-
+    final rule = _rules[code]!;
+    final needsAttribution = rule.$3;
     final attribution = needsAttribution ? source : null;
+    final label = attribution == null ? rule.$1 : '${rule.$1} · $attribution';
     return TranslationStatus(
       code: code,
-      label: attribution == null ? baseLabel : '$baseLabel · $attribution',
-      visible: visible,
+      label: label,
+      visible: rule.$2,
       attribution: attribution,
     );
   }
+
+  /// code -> (label, visible, needs attribution)
+  static const Map<String, (String, bool, bool)> _rules = <String, (String, bool, bool)>{
+    'quarantined': ('Hidden from results', false, false),
+    'superseded': ('Superseded', false, true),
+    'verified': ('Verified', true, false),
+    'flagged': ('Flagged — failed checks', true, false),
+    'user_correction': ('User correction — awaiting verification', true, false),
+    'source_supported': ('Source-supported', true, true),
+    'ai_checked': ('AI-translated, checked', true, false),
+    'ai_unverified': ('AI-translated, unverified', true, false),
+    'source_sense_unconfirmed': ('Source-recorded, sense unconfirmed', true, true),
+    'unverified_legacy': ('Unverified — source unknown', true, false),
+  };
+
+  @override
+  String toString() => 'TranslationStatus($code, $label)';
 }

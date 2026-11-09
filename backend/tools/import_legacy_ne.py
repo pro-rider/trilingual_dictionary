@@ -109,8 +109,19 @@ values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 """
 
 
-def apply(rows, store, data_version, batch):
+def apply(rows, store, data_version, batch, fail_after=None):
+    """Insert the batch in one transaction.
+
+    ``BEGIN IMMEDIATE`` takes the write lock up front, so a concurrent writer
+    cannot interleave and leave a half-imported batch. Everything the batch owns
+    — translation rows, ``id_map``, ``event_log``, the ``versions`` marker — is
+    inside that single transaction; any failure rolls all of it back.
+
+    ``fail_after`` exists only for failure-injection tests: it raises after that
+    many inserts so the rollback path can be proven on real code.
+    """
     conn = schema.connect(store)
+    conn.isolation_level = None                     # explicit transaction control
     try:
         existing = {
             (r[0], r[1], r[2])
@@ -119,11 +130,14 @@ def apply(rows, store, data_version, batch):
                 "where origin_source = ?", (ORIGIN_SOURCE,))
         }
         inserted, duplicates = 0, 0
-        with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
             for row in rows:
                 if (row["sense_key"], ORIGIN_SOURCE, row["origin_record_id"]) in existing:
                     duplicates += 1
                     continue
+                if fail_after is not None and inserted >= fail_after:
+                    raise RuntimeError("injected failure after %d rows" % inserted)
                 conn.execute(INSERT_SQL, (
                     row["sense_key"], row["entry_key"], row["language"], row["text"],
                     row["generation_method"], row["evidence_strength"],
@@ -155,6 +169,10 @@ def apply(rows, store, data_version, batch):
                 "values('import', ?, 'legacy Nepali import batch', ?)",
                 (batch, schema.utc_now()),
             )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
     finally:
         conn.close()
     return {"batch": batch, "inserted": inserted, "duplicates_skipped": duplicates}
@@ -223,9 +241,19 @@ def verify(store, dictionary, batch=None):
 
 
 def rollback_batch(store, batch):
+    """Remove one batch's translation rows, keeping the audit trail.
+
+    The rows go; the ``event_log`` entries that recorded the import stay, and an
+    explicit ``rollback_import_batch`` event is written in the same transaction.
+    ``id_map`` is kept too — it maps dictionary sense ids to stable keys and is
+    not a claim that a translation row exists. That keeps "what was imported,
+    when, and that it was withdrawn" answerable after the rows are gone.
+    """
     conn = schema.connect(store)
+    conn.isolation_level = None
     try:
-        with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
             rows = conn.execute(
                 "select count(*) from translations where import_batch = ?", (batch,)).fetchone()[0]
             conn.execute("delete from translations where import_batch = ?", (batch,))
@@ -233,11 +261,16 @@ def rollback_batch(store, batch):
                 "insert into event_log(occurred_at, actor, action, table_name, record_key, note) "
                 "values(?,?,?,?,?,?)",
                 (schema.utc_now(), "import_legacy_ne", "rollback_import_batch", "translations",
-                 batch, "removed %d imported rows; dictionary.sqlite untouched" % rows),
+                 batch, "removed %d imported rows; dictionary.sqlite untouched; audit rows kept" % rows),
             )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
     finally:
         conn.close()
-    return {"batch": batch, "deleted": rows, "dictionary_untouched": True}
+    return {"batch": batch, "deleted": rows, "dictionary_untouched": True,
+            "audit_preserved": True}
 
 
 def main():

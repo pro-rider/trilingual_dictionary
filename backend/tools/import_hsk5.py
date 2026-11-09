@@ -243,6 +243,12 @@ def main() -> int:
                 (item.word, item.word, f"{plain.replace(' ', '')} {plain}",
                  info["en"], "general", entry_id),
             )
+            if fts_sync.has_trigram(con):
+                con.execute(
+                    "INSERT INTO fts_zh(simplified, traditional, english, entry_id)"
+                    " VALUES (?,?,?,?)",
+                    (item.word, item.word, info["en"], entry_id),
+                )
             report["created"] += 1
             if info.get("ne"):
                 report["ne_filled"] += 1

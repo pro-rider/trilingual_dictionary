@@ -30,6 +30,7 @@ from .schema_v2_tables import (  # noqa: F401  (re-exported for callers)
     _TABLES_V2,
     _TRIGGERS_V2,
     _V3_ALTERS,
+    _V4_TRIGGERS,
 )
 
 DB_FILENAME = "translations.db"
@@ -237,7 +238,7 @@ def _create_v2(conn):
         conn.execute(stmt)
     for stmt in _INDEXES_V2:
         conn.execute(stmt)
-    for stmt in _TRIGGERS_V2:
+    for stmt in _TRIGGERS_V2 + _V4_TRIGGERS:
         conn.execute(stmt)
 
 
@@ -403,7 +404,7 @@ def migrate(path, dry_run=False, data_version=None):
                         continue          # created inside the rebuild, after the rename
                     conn.execute(stmt)
                 _migrate_v1_to_v2(conn)
-                for stmt in _TRIGGERS_V2:
+                for stmt in _TRIGGERS_V2 + _V4_TRIGGERS:
                     conn.execute(stmt)
                 for stmt in _INDEXES_V2:
                     if "translations" not in stmt:
@@ -424,36 +425,27 @@ def migrate(path, dry_run=False, data_version=None):
                         if col in (existing if table == "translations" else evidence_cols):
                             continue
                     conn.execute(stmt)
-                for stmt in _TRIGGERS_V2:
+                for stmt in _TRIGGERS_V2 + _V4_TRIGGERS:
                     conn.execute(stmt)
                 for stmt in _INDEXES_V2:
                     conn.execute(stmt)
                 conn.execute(
                     "insert or ignore into versions(component, version, content_hash, note, created_at) "
-                    "values('schema', ?, ?, 'upgraded from schema 2: import batch, sense match method', ?)",
+                    "values('schema', ?, ?, 'upgraded from 2: import batch, sense match method, supersede guard', ?)",
+                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
+                )
+            elif report["from_version"] == 3:
+                # Schema 3 -> 4: the guard that keeps a pipeline from replacing a
+                # verified value.
+                for stmt in _V4_TRIGGERS:
+                    conn.execute(stmt)
+                conn.execute(
+                    "insert or ignore into versions(component, version, content_hash, note, created_at) "
+                    "values('schema', ?, ?, 'upgraded from 3: verified rows need a verified successor', ?)",
                     (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
                 )
             else:
                 raise RuntimeError("no migration path from schema %s" % report["from_version"])
-            # Schema 2 -> 3: add the import/sense-match columns to an existing store.
-            if report["from_version"] == 2:
-                existing = [r[1] for r in conn.execute("pragma table_info(translations)")]
-                evidence_cols = [r[1] for r in conn.execute("pragma table_info(evidence)")]
-                for stmt in _V3_ALTERS:
-                    col = stmt.split("add column")[1].split()[0] if "add column" in stmt else None
-                    table = stmt.split("alter table")[1].split()[0] if "add column" in stmt else None
-                    if col:
-                        cols = existing if table == "translations" else evidence_cols
-                        if col in cols:
-                            continue
-                    conn.execute(stmt)
-                for stmt in _TRIGGERS_V2:
-                    conn.execute(stmt)
-                conn.execute(
-                    "insert or ignore into versions(component, version, content_hash, note, created_at) "
-                    "values('schema', ?, ?, 'upgraded from schema 2: import batch, sense match method', ?)",
-                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
-                )
             conn.execute("pragma user_version = %d" % SCHEMA_VERSION)
             if data_version:
                 conn.execute(
@@ -508,5 +500,6 @@ def rollback(path, backup_path, dry_run=False):
 
 
 def _schema_hash():
-    payload = ("\n".join(_TABLES_SHARED + _TABLES_V2 + _INDEXES_V2 + _TRIGGERS_V2)).encode("utf-8")
+    payload = ("\n".join(_TABLES_SHARED + _TABLES_V2 + _INDEXES_V2 + _TRIGGERS_V2
+                         + _V4_TRIGGERS)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:16]

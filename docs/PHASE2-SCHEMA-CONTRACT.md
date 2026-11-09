@@ -317,7 +317,8 @@ dry-run writes nothing; `sense_key` is stable across whitespace and case.
 ## 12. Known limitations / open questions
 
 1. FTS5 trigram index must be rebuilt whenever `dictionary.sqlite` is rebuilt —
-   **not automated yet**; tracked as a launch gate.
+   **automated as of Phase 2.1** (§13.6): the builder generates both indexes last
+   and refuses to emit an artifact that fails the exact-ID gate.
 2. POS source not chosen (§7) and HSK standard/URL not chosen (§8) — both block
    their backfills in Phase 1.5.
 3. The 40 Nepali values shared across different glosses are still unclassified;
@@ -325,6 +326,132 @@ dry-run writes nothing; `sense_key` is stable across whitespace and case.
 4. Provenance of the legacy AI run is unrecoverable (no model id, no prompt
    version, single `ai_cache` row).
 5. Triggers cannot stop an external tool editing the file, only SQL paths.
-6. The real store holds 0 translations, so the v1→v2 mapping is exercised by
-   synthetic fixtures in tests rather than by production data; the mapping table
-   is nevertheless implemented and asserted row-by-row.
+6. ~~The real store holds 0 translations, so the v1→v2 mapping is exercised by
+   synthetic fixtures in tests rather than by production data.~~ **Superseded:**
+   the store now holds all 3,245 legacy rows, verified row-by-row. See §13.
+
+## 13. Phase 2.1 addendum — schema v4, resolution contract, release gates
+
+This section is normative where it disagrees with anything above.
+
+### 13.1 Schema version is 4
+
+`SCHEMA_VERSION = 4` (`backend/app/translations/schema_v2_tables.py`).
+`migrate` has a 3→4 branch and the live store was migrated
+(`from_version 3 → to_version 4`, backup `translations.db.bak-202609…Z`).
+
+v4 adds four supersession guards, because "a correction creates a new record"
+is unenforceable without them:
+
+| trigger | rule |
+| --- | --- |
+| `translations_supersede_verified_needs_review` | a `verified` row may only be superseded by a `verified` row |
+| `translations_supersede_must_target_leaf` | one parent, one successor — no forks |
+| `translations_supersede_must_stay_in_sense` | successor keeps the same `sense_key` **and** `language` |
+| `translations_supersede_target_exists` | `supersedes_id` must point at a live row |
+
+A cycle is impossible through SQL because `supersedes_id` must reference an
+existing row and ids are monotonic; `resolve.ChainIntegrity` still detects one in
+data that was imported or hand-edited.
+
+### 13.2 One place resolves a translation (Flutter)
+
+`lib/data/local/translation_repository.dart` is the only entry point. Widgets do
+**not** query `dictionary.sqlite`, `translations.db`, quarantine rows or chains.
+
+`LocalTranslationRepository.resolve(senseKey, legacyText:)` returns
+`SenseTranslation{resolved, health, translationId, integrityOk}`.
+
+Store health is fail-closed — `ok / missing / unreadable / schemaMismatch`:
+
+* file missing → `missing`
+* `PRAGMA user_version` ≠ 4 → `schemaMismatch` (never read the file optimistically)
+* open or read throws (truncated, encrypted, corrupt page) → `unreadable`
+* one real read is forced during attach, so a broken file fails at open time, not
+  on the first lookup the user sees
+
+Any non-`ok` health, and any integrity failure (cycle / fork / cross-sense
+successor), degrades to *the dictionary's own value or nothing*. It never guesses
+and never substitutes another sense's text.
+
+### 13.3 Resolution precedence (exact)
+
+1. `publication_status='quarantined'` for the chosen row → that sense shows
+   nothing. Quarantine hides the sense, including the dictionary fallback;
+   otherwise hiding it would be cosmetic.
+2. A row with a successor (`supersedes_id` pointing at it) is retired → fall back
+   to the dictionary value.
+3. Governance text that is empty or whitespace → fall back to the dictionary.
+4. Governance text identical to the dictionary text → one meaning, source
+   reported as `dictionary` (no duplicate line).
+5. Otherwise → the governance text, with its derived status and attribution.
+6. Neither source → explicit `visible:false` / `source:"none"`.
+
+Both sides implement this once: `resolve.resolve_values()` (Python) and
+`resolveNepali()` (`lib/core/translation_resolution.dart`), pinned by the 8-case
+`shared/translation_resolution_golden.json`.
+
+### 13.4 Status is derived, never stored as a label
+
+Eleven-step first-match-wins ladder over the five stored dimensions, identical in
+`backend/app/translations/status.py` and `lib/core/translation_status.dart`
+(10 codes; `source_supported` additionally requires
+`generation_method='source_import'`, `evidence_language='ne'` and
+`sense_match_method ∈ {sense_gloss, sense_id, qid, article}`).
+
+| stored condition | label |
+| --- | --- |
+| `human_verification='verified'` | Verified |
+| `generation_method='source_import'` + `direct`/`strong` evidence + `passed` + ne lexical evidence + defensible sense match | Source-supported · source |
+| `generation_method='llm'` + `direct`/`strong` evidence + `passed` | AI-translated, checked |
+| `llm`, weak/no evidence or `incomplete`/`failed` validation | AI-translated, unverified |
+| legacy with unknown provenance | Unverified legacy |
+| `publication_status='quarantined'` | hidden (`visible:false`) |
+| superseded / forked / cross-sense chain | falls back to the dictionary |
+
+Dart records expose fields as `.$1/.$2/.$3`; positional indexing (`rule[0]`)
+does not compile.
+
+### 13.5 User references and supersession
+
+| user data | behaviour |
+| --- | --- |
+| bookmarks | stable sense/entry id; show the current eligible active row |
+| notes | keep the original translation id and its historical text |
+| search history / recent | resolve the current active row when displayed |
+| deep links | stable sense id; historical translation ids still open |
+| user corrections | a new row that supersedes the old one; history preserved |
+
+`resolve.resolve_reference(conn, translation_id, policy="active"|"pinned")` —
+a pinned reference is never rewritten; an `active` one follows the chain to the
+leaf, and a broken chain returns an explicit unresolved state instead of a value.
+
+### 13.6 Release gates
+
+| gate | mechanism | failure behaviour |
+| --- | --- | --- |
+| FTS exact-ID completeness | `tools/validate_fts.py` (entry-id set for `fts` **and** `fts_zh`, duplicates, count, tokenizer-aware probe, `quick_check`) | exit 1; `build_dictionary.py` deletes the artifact, `r5_import.py --promote` returns 1 |
+| transactional import | `BEGIN IMMEDIATE` around rows + `id_map` + `event_log` + `versions` | exception → `ROLLBACK`, no partial batch |
+| rollback auditable | `rollback_batch` deletes only that batch's rows, keeps `id_map` and the original import event, appends `rollback_import_batch` | — |
+| golden parity | `tools/check_translation_golden.py` (only sanctioned writer; refuses unknown codes) | exit 1 on drift |
+| CI | `.github/workflows/contracts.yml` (pytest + `flutter test` + golden gate) | job fails |
+
+No mandatory check uses `assert`; every one is an explicit branch that returns
+non-zero. `ATTACH DATABASE` is **not** used — the repository opens each store
+read-only, one connection at a time, and joins in Dart.
+
+### 13.7 FTS: the 76-row hole and why it was not "random loss"
+
+`entries.status` = `imported 123,596` / `ai_translated 76`. The 76 are ids
+123,597–123,672, appended by `r5_import.py` **after** the index was built; that
+path wrote `fts` in place but skipped `fts_zh`'s trigram branch. Fix: both indexes
+are generated once at the end of `build_dictionary.py` via
+`delete from <t>` + a single `insert … select … from entries`; a missing trigram
+tokenizer is a `SystemExit`, not a silent downgrade. Rebuild reproducibility is
+proven by `tools/fts_repro_check.py` (two independent copies + a second pass on
+one copy produce identical fingerprints, and the source asset is unchanged).
+
+Note: fts5 trigram cannot match 1–2 character queries (`的`, `水`, `一天` return 0
+hits by design), so such a miss is not evidence of a defect; the exact-ID set is
+the integrity signal.
+

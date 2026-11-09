@@ -20,9 +20,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   InputLanguage _inputLang = InputLanguage.english;
 
+  /// Longest text accepted in the search box. The server analyser takes 4,000
+  /// characters; pasting a whole paragraph used to be impossible at 500, so
+  /// this is the real ceiling now, with the overflow cut rather than rejected.
+  static const int maxQueryLength = 4000;
+
   void _submit(String value) {
-    final q = value.trim();
+    var q = value.trim();
     if (q.isEmpty) return;
+    if (q.length > maxQueryLength) {
+      q = q.substring(0, maxQueryLength);
+      _controller.text = q;
+      _controller.selection = TextSelection.collapsed(offset: q.length);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Text cut to $maxQueryLength characters — longer than '
+              'the analyser accepts.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
     final lang = Normalizer.detectLanguage(q);
     ref.read(historyProvider.notifier).add(q);
     final route = _shouldAnalyze(q, lang)

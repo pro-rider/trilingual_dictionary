@@ -31,9 +31,11 @@ class AnalyzeScreen extends ConsumerWidget {
             'Could not analyze. Please check your connection.'),
         data: (data) {
           if (data == null) {
+            // analyzeProvider already falls back to the bundled database; null
+            // here means even that failed, so point at the real remedy.
             return _message(context,
-                'Backend not reachable. Analysis needs the server. '
-                'Make sure the FastAPI backend is running.');
+                'This text could not be analysed. Open a word from the search '
+                'box — the offline dictionary is still available.');
           }
           if (data.error.isNotEmpty && data.segments.isEmpty) {
             return _message(context, data.error);
@@ -83,10 +85,12 @@ class AnalyzeScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFF59E0B)),
             ),
-            child: const Text(
-              'Some words could not be resolved offline (AI offline). '
-              'Their meanings are left blank.',
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF92400E)),
+            child: Text(
+              data.error.isNotEmpty
+                  ? data.error
+                  : 'Some words could not be resolved offline (AI offline). '
+                      'Their meanings are left blank.',
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF92400E)),
             ),
           ),
         ],

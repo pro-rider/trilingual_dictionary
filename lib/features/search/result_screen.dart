@@ -173,7 +173,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         const SizedBox(height: 14),
         // Picture for this entry, loaded separately so the meaning never waits
         // on the network (stage 44 of the image plan).
-        WordImageCard(entryId: entry.entryId),
+        WordImageCard(entryId: entry.entryId, wordZh: entry.wordZh),
       ],
     );
   }
@@ -215,9 +215,9 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         : online
             ? '“${widget.query}” is not in the dictionary and the AI could not '
                 'answer right now (provider error or limit). Try again in a moment.'
-            : 'You are offline, so only the small bundled dictionary '
-                '(6 words) can answer. The full dictionary and the AI lookup '
-                'both need a connection.';
+            : 'Not in the offline dictionary either — the bundled database is '
+                'still being filled in for this word. Adding the AI lookup back '
+                'needs a connection.';
     final buttonLabel = online == true ? 'Try again' : 'Reconnect and retry';
 
     return Center(

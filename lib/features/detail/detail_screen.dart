@@ -83,7 +83,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                 if (i == _senseIndex)
                   ResultCard(sense: senses[i]),
               const SizedBox(height: 14),
-              WordImageCard(entryId: entry.entryId),
+              WordImageCard(entryId: entry.entryId, wordZh: entry.wordZh),
             ],
           );
         },

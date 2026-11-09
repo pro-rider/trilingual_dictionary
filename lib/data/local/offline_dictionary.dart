@@ -9,9 +9,39 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../core/normalizer.dart';
 import '../api_client.dart';
+import '../models/analyzed_text.dart';
 import '../models/dictionary_entry.dart';
 import '../models/example_sentence.dart';
 import '../models/sense.dart';
+
+/// One approved image for an entry, as stored inside the bundled database.
+///
+/// `assetPath` points at a WebP thumbnail shipped in the APK (≤15 KB), so the
+/// picture renders with no network at all. `remoteUrl` is the high-resolution
+/// original, used only when the user asks for it (Issue 12: offline first).
+class EntryImage {
+  const EntryImage({
+    required this.imageId,
+    required this.assetPath,
+    required this.remoteUrl,
+    required this.attribution,
+    required this.license,
+    required this.matchMethod,
+    required this.confidence,
+    required this.width,
+    required this.height,
+  });
+
+  final int imageId;
+  final String assetPath;
+  final String remoteUrl;
+  final String attribution;
+  final String license;
+  final String matchMethod;
+  final double confidence;
+  final int width;
+  final int height;
+}
 
 /// The full 123,672-entry dictionary, shipped inside the APK as a gzipped
 /// SQLite file and unpacked once into the app's support directory.
@@ -28,7 +58,7 @@ class OfflineDictionary {
   /// phone keeps its own copy of the database (it writes Nepali glosses and
   /// example sentences into it), so a plain "file exists" check would silently
   /// keep serving the old words forever.
-  static const String assetVersion = '2026-11-08.4';
+  static const String assetVersion = '2026-11-09.3';
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.
@@ -311,15 +341,27 @@ class OfflineDictionary {
     final examplesBySense = <int, List<ExampleSentence>>{};
     for (final ex in exampleRows) {
       final en = (ex['en'] as String?) ?? '';
+      final zh = (ex['zh'] as String?) ?? '';
+      final ne = (ex['ne'] as String?) ?? '';
       if (en.isEmpty) continue;
+      // Never show a sentence we know is wrong: a Korean/Cyrillic fragment in
+      // the Chinese line means an import defect, and a Nepali line without
+      // Devanagari means the translation never happened. Quarantined rows are
+      // dropped outright (Issue: "some sentences should not be shown").
+      final status = (ex['review_status'] as String?) ?? '';
+      if (status == 'quarantined') continue;
+      if (_hasForeignScript(zh) || (ne.isNotEmpty && !_isDevanagari(ne))) {
+        continue;
+      }
+      final trusted = status == 'reviewed' || status == 'imported';
       examplesBySense
           .putIfAbsent((ex['sense_id'] as int?) ?? -1, () => [])
           .add(ExampleSentence(
             en: en,
-            zh: (ex['zh'] as String?) ?? '',
-            ne: (ex['ne'] as String?) ?? '',
-            source: 'ai_draft',
-            reviewStatus: 'approved',
+            zh: zh,
+            ne: ne,
+            source: trusted ? 'curated' : 'ai_draft',
+            reviewStatus: trusted ? 'approved' : 'draft',
           ));
     }
 
@@ -364,8 +406,331 @@ class OfflineDictionary {
     );
   }
 
-  static String _shortGloss(String gloss) {
-    final cut = gloss.split(RegExp(r'[;,(]')).first.trim();
+  /// Analyse text with the bundled dictionary alone.
+  ///
+  /// Pasting a paragraph used to open the `Analyze` route, which only the
+  /// backend can answer — offline the user got a dead end saying "Analysis
+  /// needs the server". The words of that paragraph are all in the 96 MB
+  /// database already on the phone, so this walks the text and returns one
+  /// segment per unit: a real meaning where the dictionary has it, an honest
+  /// "not in the offline dictionary" where it does not.
+  ///
+  /// `maxUnits` bounds the work a long paste can cause (~0.5 ms per lookup);
+  /// anything past it is reported through [AnalyzedText.degraded] instead of
+  /// silently dropped.
+  Future<AnalyzedText> analyzeOffline(
+    String text,
+    InputLanguage lang, {
+    int maxUnits = 300,
+  }) async {
+    final db = await _open();
+    if (db == null) {
+      return AnalyzedText(text: text, error: 'Offline dictionary unavailable');
+    }
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return const AnalyzedText(error: 'Nothing to analyse');
+    }
+    final segments = <AnalyzedSegment>[];
+    var truncated = false;
+    // One paragraph repeats the same handful of words; resolving each one again
+    // costs a query. On a 300-unit paste this is the difference between well
+    // under a second and half a minute.
+    final memo = <String, AnalyzedSegment?>{};
+    final started = DateTime.now();
+
+    if (lang == InputLanguage.chinese) {
+      // Greedy longest match: Chinese has no spaces, so 中国人 must beat 中 + 国.
+      var i = 0;
+      while (i < trimmed.length) {
+        if (segments.length >= maxUnits) {
+          truncated = true;
+          break;
+        }
+        final char = trimmed[i];
+        if (_isCjk(char)) {
+          var matched = '';
+          for (var len = 4; len >= 1; len--) {
+            if (i + len > trimmed.length) continue;
+            final chunk = trimmed.substring(i, i + len);
+            if (!_isAllCjk(chunk)) continue;
+            final row = await _exactRow(db, chunk);
+            if (row != null) {
+              matched = chunk;
+              segments.add(await _segmentFor(row, chunk, isChinese: true));
+              break;
+            }
+          }
+          if (matched.isNotEmpty) {
+            i += matched.length;
+            continue;
+          }
+          segments.add(AnalyzedSegment(surface: char, source: 'unresolved'));
+          i += 1;
+          continue;
+        }
+        if (_isPunctuation(char)) {
+          segments.add(AnalyzedSegment(
+              surface: char, kind: 'punctuation', source: 'dataset'));
+        } else if (char.trim().isNotEmpty) {
+          segments.add(AnalyzedSegment(surface: char, source: 'unresolved'));
+        }
+        i += 1;
+      }
+    } else {
+      final tokens = RegExp(r"[A-Za-z][A-Za-z'-]*|[\u4e00-\u9fff]|[^\sA-Za-z\u4e00-\u9fff]")
+          .allMatches(trimmed)
+          .map((m) => m.group(0)!)
+          .toList();
+      for (final token in tokens) {
+        if (segments.length >= maxUnits) {
+          truncated = true;
+          break;
+        }
+        if (_isPunctuation(token)) {
+          segments.add(AnalyzedSegment(
+              surface: token, kind: 'punctuation', source: 'dataset'));
+          continue;
+        }
+        final lower = token.toLowerCase();
+        if (_isCjk(token) || _stopWords.contains(lower)) {
+          segments.add(AnalyzedSegment(
+              surface: token,
+              kind: _isCjk(token) ? 'word' : 'function',
+              source: 'stopword'));
+          continue;
+        }
+        if (memo.containsKey(lower)) {
+          final hit = memo[lower];
+          segments.add(hit == null
+              ? AnalyzedSegment(surface: token, source: 'unresolved')
+              : AnalyzedSegment(
+                  surface: token,
+                  kind: hit.kind,
+                  wordEn: hit.wordEn,
+                  wordZh: hit.wordZh,
+                  pinyin: hit.pinyin,
+                  pos: hit.pos,
+                  meaningEn: hit.meaningEn,
+                  meaningZh: hit.meaningZh,
+                  meaningNe: hit.meaningNe,
+                  source: hit.source,
+                ));
+          continue;
+        }
+        var resolved = await _resolveToken(db, token, lower);
+        memo[lower] = resolved;
+        segments.add(resolved ?? AnalyzedSegment(surface: token, source: 'unresolved'));
+        if (segments.length >= 40 &&
+            DateTime.now().difference(started).inMilliseconds > 2500) {
+          truncated = true;
+          break;
+        }
+      }
+    }
+
+    return AnalyzedText(
+      text: trimmed,
+      mode: 'paragraph',
+      language: lang == InputLanguage.chinese ? 'zh' : 'en',
+      segments: segments,
+      degraded: truncated,
+      error: truncated
+          ? 'Showing the first $maxUnits units only — the offline analyser has '
+              'a length limit. Use the server analyser for the full text.'
+          : '',
+    );
+  }
+
+  /// Resolve one English token: exact gloss first, then the normal search path.
+  Future<AnalyzedSegment?> _resolveToken(
+      Database db, String token, String lower) async {
+    final row = await _exactRow(db, lower);
+    if (row != null) return _segmentFor(row, token, isChinese: false);
+    if (lower.length < 3) return null;
+    final entry = await search(token, InputLanguage.english);
+    final id = entry?.entryId;
+    if (id == null || !id.startsWith('zh')) return null;
+    final pk = int.tryParse(id.replaceFirst('zh', ''));
+    if (pk == null) return null;
+    final found = await _exactIdRow(db, pk);
+    if (found == null) return null;
+    return _segmentFor(found, token, isChinese: false);
+  }
+
+  Future<Map<String, Object?>?> _exactRow(Database db, String word) async {
+    Map<String, Object?>? row = await _first(db,
+        'SELECT * FROM entries WHERE simplified = ? '
+        'ORDER BY is_proper, LENGTH(simplified) LIMIT 1', [word]);
+    row ??= await _first(db,
+        'SELECT * FROM entries WHERE traditional = ? '
+        'ORDER BY is_proper, LENGTH(simplified) LIMIT 1', [word]);
+    if (row == null) {
+      // English side: a sense whose gloss is exactly this word.
+      final hits = await _first(db,
+          'SELECT e.*, s.gloss_en FROM senses s JOIN entries e '
+          'ON e.entry_id = s.entry_id '
+          "WHERE LOWER(TRIM(s.gloss_en)) = ? "
+          'ORDER BY e.freq_rank IS NULL, e.freq_rank, LENGTH(e.simplified) '
+          'LIMIT 1', [word]);
+      row = hits;
+    }
+    return row;
+  }
+
+  Future<Map<String, Object?>?> _exactIdRow(Database db, int entryId) {
+    return _first(db, 'SELECT * FROM entries WHERE entry_id = ? LIMIT 1', [entryId]);
+  }
+
+  /// One analysed unit: the entry plus its first sense, in the three languages.
+  Future<AnalyzedSegment> _segmentFor(
+    Map<String, Object?> row,
+    String surface, {
+    required bool isChinese,
+  }) async {
+    final db = await _open();
+    final sense = db == null
+        ? null
+        : await _first(
+            db,
+            'SELECT * FROM senses WHERE entry_id = ? '
+            'ORDER BY sense_order LIMIT 1',
+            [row['entry_id']],
+          );
+    final zh = ((row['simplified'] as String?) ?? '').trim();
+    final gloss = ((sense?['gloss_en'] as String?) ??
+            (row['gloss_en'] as String?) ??
+            '')
+        .trim();
+    return AnalyzedSegment(
+      surface: surface,
+      kind: 'word',
+      wordEn: isChinese ? gloss.split(';').first.trim() : surface,
+      wordZh: zh,
+      pinyin: ((row['pinyin_marked'] as String?) ??
+          (row['pinyin_plain'] as String?) ??
+          ''),
+      pos: ((row['pos_primary'] as String?) ?? ''),
+      meaningEn: gloss,
+      meaningZh: ((sense?['gloss_zh'] as String?) ?? zh),
+      meaningNe: ((sense?['gloss_ne'] as String?) ?? ''),
+      source: 'dataset',
+    );
+  }
+
+  static final Set<String> _stopWords = {
+    'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'than', 'as', 'at',
+    'in', 'on', 'of', 'for', 'with', 'from', 'by', 'to', 'is', 'are', 'was',
+    'were', 'be', 'been', 'being', 'am', 'do', 'does', 'did', 'have', 'has',
+    'had', 'will', 'would', 'can', 'could', 'may', 'might', 'must', 'shall',
+    'should', 'not', 'no', 'yes', 'so', 'this', 'that', 'these', 'those',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'them', 'his', 'her', 'its',
+    'their', 'our', 'your', 'my', 'me', 'us', 'which', 'who', 'whom', 'whose',
+    'what', 'when', 'where', 'why', 'how', 'there', 'here', 'also', 'very',
+  };
+
+  static bool _isCjk(String c) =>
+      RegExp(r'[\u3400-\u4dbf\u4e00-\u9fff]').hasMatch(c);
+
+  static bool _isAllCjk(String s) =>
+      s.isNotEmpty && s.split('').every(_isCjk);
+
+  static bool _isPunctuation(String c) =>
+      RegExp(r'''[.,;:!?()\[\]{}"'“”‘’—–…·、。，；：！？（）【】]''').hasMatch(c);
+
+  /// The approved image for this entry, if the bundled database has one.
+  ///
+  /// Returns null rather than throwing: a word without a verified picture must
+  /// keep its meanings readable (Issue 7 — "unavailable" is a normal state).
+  Future<EntryImage?> imageForEntry(int entryPk) async {
+    final db = await _open();
+    if (db == null) return null;
+    final rows = await db.rawQuery(
+      'SELECT i.image_id, i.thumb_asset, i.detail_url, i.attribution_text, '
+      '       i.license, i.width, i.height, ei.match_method, '
+      '       COALESCE(ei.match_confidence, ei.confidence) AS conf '
+      'FROM entry_images ei JOIN images i ON i.image_id = ei.image_id '
+      "WHERE ei.entry_id = ? AND i.status = 'approved' "
+      "  AND COALESCE(i.asset_status, 'approved') = 'approved' "
+      "  AND i.thumb_asset IS NOT NULL AND i.thumb_asset != '' "
+      'ORDER BY ei.rank LIMIT 1',
+      [entryPk],
+    );
+    return rows.isEmpty ? null : _imageFromRow(rows.first);
+  }
+
+  /// The approved image for a headword, ignoring which row it was indexed on.
+  ///
+  /// Not every entry the UI shows comes from this database — the bundled seed
+  /// words and AI answers carry ids like `seed:book`, so keying the picture on
+  /// the id alone left them permanently on the placeholder even though 书 had a
+  /// thumbnail in the very same APK. Chinese has several headwords for one
+  /// concept anyway (玩具/玩意, 书/册), so the headword is the honest second key.
+  Future<EntryImage?> imageForWord(String wordZh) async {
+    final db = await _open();
+    if (db == null) return null;
+    final word = wordZh.trim();
+    if (word.isEmpty) return null;
+    final rows = await db.rawQuery(
+      'SELECT i.image_id, i.thumb_asset, i.detail_url, i.attribution_text, '
+      '       i.license, i.width, i.height, ei.match_method, '
+      '       COALESCE(ei.match_confidence, ei.confidence) AS conf '
+      'FROM entry_images ei JOIN images i ON i.image_id = ei.image_id '
+      'JOIN entries e ON e.entry_id = ei.entry_id '
+      "WHERE (e.simplified = ? OR e.traditional = ?) "
+      "  AND i.status = 'approved' "
+      "  AND COALESCE(i.asset_status, 'approved') = 'approved' "
+      "  AND i.thumb_asset IS NOT NULL AND i.thumb_asset != '' "
+      'ORDER BY ei.rank, conf DESC LIMIT 1',
+      [word, word],
+    );
+    return rows.isEmpty ? null : _imageFromRow(rows.first);
+  }
+
+  EntryImage _imageFromRow(Map<String, Object?> row) {
+    final asset = ((row['thumb_asset'] as String?) ?? '').trim();
+    return EntryImage(
+      imageId: (row['image_id'] as int?) ?? -1,
+      assetPath: asset,
+      remoteUrl: (row['detail_url'] as String?) ?? '',
+      attribution: (row['attribution_text'] as String?) ?? '',
+      license: (row['license'] as String?) ?? '',
+      matchMethod: (row['match_method'] as String?) ?? '',
+      confidence: ((row['conf'] as num?) ?? 0).toDouble(),
+      width: (row['width'] as int?) ?? 0,
+      height: (row['height'] as int?) ?? 0,
+    );
+  }
+
+  /// Hangul or Cyrillic inside the Chinese line = an import defect, not  /// Chinese. A few imported rows carry exactly that (《 코드盖斯》).
+  static bool _hasForeignScript(String text) {
+    for (final rune in text.runes) {
+      if ((rune >= 0x1100 && rune <= 0x11FF) ||
+          (rune >= 0x3130 && rune <= 0x318F) ||
+          (rune >= 0xAC00 && rune <= 0xD7AF) ||
+          (rune >= 0x0400 && rune <= 0x04FF)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Devanagari block — the script Nepali is written in.
+  static bool _isDevanagari(String text) {
+    var seen = false;
+    for (final rune in text.runes) {
+      if (rune >= 0x0900 && rune <= 0x097F) {
+        seen = true;
+      } else if (rune >= 0x0041 && rune <= 0x007A) {
+        // Latin inside Nepali is legitimate only for acronyms/scientific names;
+        // for a full sentence it means the translation was copied, not done.
+        if (text.runes.length > 6) return false;
+      }
+    }
+    return seen;
+  }
+
+  static String _shortGloss(String gloss) {    final cut = gloss.split(RegExp(r'[;,(]')).first.trim();
     return cut.isEmpty ? gloss : cut;
   }
 

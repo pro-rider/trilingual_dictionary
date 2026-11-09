@@ -1,5 +1,11 @@
 # Phase 1 — schema specification and audit result
 
+> **Superseded by schema 2.** `docs/PHASE2-SCHEMA-CONTRACT.md` replaces the
+> single `status` column with independent dimensions (generation method,
+> evidence strength, validation, publication, human verification) and makes
+> human verification append-only. This file stays as the historical record of
+> what schema 1 did and why; the store itself is now at schema 2.
+
 Deliverables of this phase: a read-only audit (`docs/PHASE1-AUDIT.md`), this
 schema specification, and a tested migration that creates the store, backs up
 before any change and can roll back. No agent code exists yet.

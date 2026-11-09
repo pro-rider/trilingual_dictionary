@@ -1,39 +1,44 @@
-"""Translation store schema — version 1.
+"""Translation store — schema 2 (see ``docs/PHASE2-SCHEMA-CONTRACT.md``).
 
 Lives in its own file (``data/build/translations.db``) next to the shipped
 dictionary, never inside ``dictionary.sqlite``: the dictionary file is replaced
-whenever ``assetVersion`` changes, and reviewed content must survive that.
-
-Two rules are enforced by the database itself, not by callers:
-
-* ``verified`` and ``reviewed`` rows are immutable. An import or the agent may
-  only `insert` a new proposal row that points at the old one through
-  ``supersedes_id``; ``update`` and ``delete`` are aborted by triggers.
-* A ``sense_key`` identifies a meaning, not a row. Row ids are rebuilt whenever
-  the dictionary is rebuilt; the key is ``simplified + pinyin + gloss_en`` and
-  is the only thing that may be written to by content jobs.
+whenever ``assetVersion`` changes and reviewed content must survive that.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import sqlite3
 from datetime import datetime, timezone
 
-SCHEMA_VERSION = 1
+from .schema_v2_tables import (  # noqa: F401  (re-exported for callers)
+    EVIDENCE_CATEGORIES,
+    GENERATION_METHODS,
+    HUMAN_VERIFICATION,
+    KEY_SEPARATOR,
+    LEGACY_EVIDENCE_MAP,
+    LEGACY_STATUS_MAP,
+    LEGACY_STATUSES,
+    PUBLICATION_STATUSES,
+    SCHEMA_VERSION,
+    VALIDATION_STATUSES,
+    EVIDENCE_STRENGTHS,
+    _INDEXES_V2,
+    _TABLES_V1,
+    _TABLES_V2,
+    _TRIGGERS_V2,
+)
+
 DB_FILENAME = "translations.db"
 
-STATUSES = ("verified", "reviewed", "ai_checked", "ai_unverified", "quarantined")
-SOURCE_TYPES = ("human", "dict", "ai", "import")
-EVIDENCE_CATEGORIES = ("A", "B", "C", "D")
-KEY_SEPARATOR = "\x1f"
-
-_DDL = [
+#: Tables that schema 1 and 2 share, unchanged.
+_TABLES_SHARED = [
     """
     create table if not exists versions(
         version_id   integer primary key autoincrement,
-        component    text not null,      -- schema | dictionary | prompt | model | termbase | evidence
+        component    text not null,
         version      text not null,
         content_hash text,
         note         text,
@@ -47,95 +52,43 @@ _DDL = [
         entry_key    text not null,
         sense_id     integer not null,
         sense_key    text not null,
-        data_version text not null,      -- dictionary version this mapping was built from
+        data_version text not null,
         primary key (sense_id, data_version)
     )
     """,
     """
     create table if not exists evidence(
-        evidence_id  text primary key,    -- sha1(source|source_ref|fetched_at)
+        evidence_id  text primary key,
         sense_key    text not null,
         category     text not null check (category in ('A','B','C','D')),
-        source       text not null,      -- wiktionary | kaikki | tatoeba | wikidata | wikipedia | commons | llm
-        source_ref   text not null,      -- page title / sentence id / QID
+        source       text not null,
+        source_ref   text not null,
         url          text,
         license      text,
         license_url  text,
         snippet      text,
-        match_method text,               -- gloss_exact | gloss_normalized | sentence_contains | qid | none
+        match_method text,
         match_score  real,
         fetched_at   text not null,
         data_version text,
         unique(sense_key, source, source_ref)
     )
     """,
-    """
-    create table if not exists translations(
-        translation_id    integer primary key autoincrement,
-        sense_key         text not null,
-        entry_key         text not null,
-        language          text not null check (language in ('ne','zh','en')),
-        text              text not null,
-        status            text not null check (status in ('verified','reviewed','ai_checked','ai_unverified','quarantined')),
-        source_type       text not null check (source_type in ('human','dict','ai','import')),
-        evidence_ids      text,          -- JSON array of evidence_id
-        evidence_category text check (evidence_category in ('A','B','C','D')),
-        model_version     text,
-        prompt_version    text,
-        source_data_version text,
-        confidence        real,
-        flags             text,          -- JSON object of validator flags
-        reviewer          text,
-        reviewed_at       text,
-        reviewer_note     text,
-        supersedes_id     integer references translations(translation_id),
-        created_at        text not null
-    )
-    """,
-    """
-    create index if not exists translations_by_sense
-        on translations(sense_key, language, status)
-    """,
-    """
-    create unique index if not exists translations_unique_active_value
-        on translations(sense_key, language, text)
-        where status in ('verified','reviewed','ai_checked')
-    """,
-    """
-    create index if not exists translations_by_supersedes
-        on translations(supersedes_id)
-    """,
-    """
-    create trigger if not exists translations_immutable_update
-    before update on translations
-    when old.status in ('verified','reviewed')
-    begin
-        select raise(abort,
-            'verified/reviewed rows are immutable; insert a superseding proposal instead');
-    end
-    """,
-    """
-    create trigger if not exists translations_immutable_delete
-    before delete on translations
-    when old.status in ('verified','reviewed')
-    begin
-        select raise(abort,
-            'verified/reviewed rows are immutable; insert a superseding proposal instead');
-    end
-    """,
-    """
-    create trigger if not exists translations_review_requires_reviewer
-    before insert on translations
-    when new.status in ('verified','reviewed') and (new.reviewer is null or trim(new.reviewer) = '')
-    begin
-        select raise(abort, 'verified/reviewed rows need a reviewer');
-    end
-    """,
 ]
+
+_V1_TRIGGER_NAMES = (
+    "translations_immutable_update",
+    "translations_immutable_delete",
+    "translations_review_requires_reviewer",
+)
 
 
 def utc_stamp():
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def utc_now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def normalize(value):
@@ -170,31 +123,188 @@ def user_version(conn):
     return conn.execute("pragma user_version").fetchone()[0]
 
 
+def table_names(conn):
+    return [r[0] for r in conn.execute(
+        "select name from sqlite_master where type='table' order by name")]
+
+
+def trigger_names(conn):
+    return [r[0] for r in conn.execute(
+        "select name from sqlite_master where type='trigger' order by name")]
+
+
+def snapshot(path):
+    """Logical fingerprint: schema version + table inventory + row counts.
+
+    Used to prove a rollback restored the previous *content*; file hashes are
+    not reliable because SQLite may rewrite page layout when copying.
+    """
+    if not os.path.exists(path):
+        return None
+    conn = sqlite3.connect("file:%s?mode=ro" % path.replace("\\", "/"), uri=True)
+    try:
+        tables = table_names(conn)
+        return {
+            "user_version": user_version(conn),
+            "tables": tables,
+            "counts": {t: conn.execute("select count(*) from %s" % t).fetchone()[0] for t in tables},
+        }
+    finally:
+        conn.close()
+
+
 def backup(path):
-    """Copy the database next to itself, and return the backup path.
+    """Copy the database beside itself with SQLite's backup API.
 
-    The copy is made with SQLite's own backup API so a live WAL is included.
-    A plain file copy of a WAL database can be torn; this cannot.
-
-    Note: the backup carries the same *content* but not necessarily the same
-    bytes — SQLite may rewrite page order and the freelist. Compare backups by
-    schema version and row counts, never by file hash.
+    A plain file copy of a WAL database can be torn; the backup API cannot.
+    The copy carries the same content but not necessarily the same bytes.
     """
     if not os.path.exists(path):
         return None
     dest = "%s.bak-%s" % (path, utc_stamp())
-    src_conn = sqlite3.connect(path)
-    dst_conn = sqlite3.connect(dest)
+    src = sqlite3.connect(path)
+    dst = sqlite3.connect(dest)
     try:
-        src_conn.backup(dst_conn)
+        src.backup(dst)
     finally:
-        dst_conn.close()
-        src_conn.close()
+        dst.close()
+        src.close()
     return dest
 
 
+def _log_event(conn, actor, action, table_name, record_key=None, before=None, after=None, note=None):
+    conn.execute(
+        "insert into event_log(occurred_at, actor, action, table_name, record_key, "
+        "before_json, after_json, note) values(?,?,?,?,?,?,?,?)",
+        (utc_now(), actor, action, table_name, record_key,
+         json.dumps(before, ensure_ascii=False) if before is not None else None,
+         json.dumps(after, ensure_ascii=False) if after is not None else None,
+         note),
+    )
+
+
+def _translations_ddl_v2():
+    for stmt in _TABLES_V2:
+        if "create table if not exists translations(" in stmt:
+            return stmt
+    raise RuntimeError("v2 translations DDL not found")
+
+
+def _create_v2(conn):
+    for stmt in _TABLES_SHARED + _TABLES_V2:
+        conn.execute(stmt)
+    for stmt in _INDEXES_V2:
+        conn.execute(stmt)
+    for stmt in _TRIGGERS_V2:
+        conn.execute(stmt)
+
+
+def _migrate_v1_to_v2(conn):
+    """Rebuild ``translations`` with the dimension fields and map every row.
+
+    Rows are preserved one-for-one (same translation_id), the legacy status is
+    kept verbatim in ``legacy_status``, and every row lands on
+    ``human_verification = 'not_verified'``: an old status name is not proof of
+    human verification. Each migrated row gets an event-log entry saying so.
+    """
+    for name in _V1_TRIGGER_NAMES:
+        conn.execute("drop trigger if exists %s" % name)
+    conn.execute("drop index if exists translations_unique_active_value")
+
+    conn.execute("alter table translations rename to translations_v1")
+    conn.execute(_translations_ddl_v2())
+    for stmt in _INDEXES_V2:
+        if "translations" in stmt:
+            conn.execute(stmt)
+    for stmt in _TRIGGERS_V2:
+        if "translations" in stmt:
+            conn.execute(stmt)
+
+    rows = conn.execute("select * from translations_v1").fetchall()
+    columns = [d[0] for d in conn.execute("select * from translations_v1 limit 1").description]
+    index = {name: i for i, name in enumerate(columns)}
+
+    migrated = []
+    for row in rows:
+        legacy = row[index["status"]]
+        method, strength, validation, publication, verification = LEGACY_STATUS_MAP[legacy]
+        category = row[index["evidence_category"]]
+        if category in LEGACY_EVIDENCE_MAP:
+            strength = LEGACY_EVIDENCE_MAP[category]
+            if method == "legacy_unknown":
+                method = "source_import"
+        source_type = row[index["source_type"]]
+        origin_method = {
+            "ai": "llm", "dict": "source_import", "import": "source_import", "human": "human",
+        }.get(source_type, "legacy_unknown")
+        # A legacy quarantine carried no reason field; record that honestly rather
+        # than inventing one. The original text stays recoverable in quarantine_records.
+        q_reason = q_rule = q_batch = q_at = None
+        if legacy == "quarantined":
+            q_reason = "legacy status 'quarantined' from schema 1; reason not recorded"
+            q_rule, q_batch, q_at = "legacy_status", "migration:v1->v2", utc_now()
+        migrated.append((
+            row[index["translation_id"]], row[index["sense_key"]], row[index["entry_key"]],
+            row[index["language"]], row[index["text"]], legacy,
+            method, strength, validation, publication, verification,
+            None,                                   # verification_authority_id
+            None, None, None, None, None,           # origin_source..origin_retrieved_at
+            origin_methods_note(origin_method),
+            None,                                   # sense_match_confidence
+            row[index["evidence_ids"]], category,
+            row[index["model_version"]], row[index["prompt_version"]],
+            row[index["source_data_version"]], None,
+            row[index["confidence"]], row[index["flags"]],
+            row[index["reviewer"]], row[index["reviewed_at"]], row[index["reviewer_note"]],
+            q_reason, q_rule, q_batch, q_at,
+            row[index["supersedes_id"]], row[index["created_at"]], utc_now(),
+        ))
+        _log_event(
+            conn, actor="migration:v1->v2", action="map_legacy_status",
+            table_name="translations", record_key=str(row[index["translation_id"]]),
+            before={"status": legacy, "source_type": source_type},
+            after={"generation_method": method, "evidence_strength": strength,
+                   "validation_status": validation, "publication_status": publication,
+                   "human_verification": "not_verified"},
+            note="legacy status name is not evidence of human verification",
+        )
+
+    insert_sql = """
+        insert into translations(
+            translation_id, sense_key, entry_key, language, text, legacy_status,
+            generation_method, evidence_strength, validation_status,
+            publication_status, human_verification, verification_authority_id,
+            origin_source, origin_source_url, origin_source_version,
+            origin_record_id, origin_retrieved_at, origin_method,
+            sense_match_confidence, evidence_ids, evidence_category,
+            model_version, prompt_version, source_data_version, validator_version,
+            confidence, flags, reviewer, reviewed_at, reviewer_note,
+            quarantine_reason, quarantine_rule, quarantine_batch, quarantined_at,
+            supersedes_id, created_at, updated_at)
+        values(%s)
+    """ % ",".join(["?"] * 37)
+    if migrated:
+        conn.executemany(insert_sql, migrated)
+
+    # Preserve the original text of every legacy quarantine, so it can be restored.
+    for row in rows:
+        if row[index["status"]] != "quarantined":
+            continue
+        conn.execute(
+            "insert into quarantine_records(translation_id, sense_key, original_text, reason, "
+            "rule, batch_id, quarantined_at, note) values(?,?,?,?,?,?,?,?)",
+            (row[index["translation_id"]], row[index["sense_key"]], row[index["text"]],
+             "legacy status 'quarantined' from schema 1; reason not recorded",
+             "legacy_status", "migration:v1->v2", utc_now(),
+             "text preserved so the row can be restored or re-reviewed"),
+        )
+
+    conn.execute("drop table translations_v1")
+    return {"migrated_rows": len(migrated)}
+
+
 def migrate(path, dry_run=False, data_version=None):
-    """Create or upgrade the translation store. Returns a report dict."""
+    """Create the store or upgrade it to ``SCHEMA_VERSION``. Returns a report."""
     report = {
         "path": path,
         "dry_run": bool(dry_run),
@@ -208,45 +318,88 @@ def migrate(path, dry_run=False, data_version=None):
         conn = sqlite3.connect(path)
         report["from_version"] = user_version(conn)
         conn.close()
-        if report["from_version"] >= SCHEMA_VERSION:
+        if report["from_version"] > SCHEMA_VERSION:
+            raise RuntimeError(
+                "store is at schema %s, newer than this release (%s); refusing to touch it"
+                % (report["from_version"], SCHEMA_VERSION))
+        if report["from_version"] == SCHEMA_VERSION:
             report["actions"].append("already at version %d, nothing to do" % SCHEMA_VERSION)
             return report
         if not dry_run:
             report["backup"] = backup(path)
-            report["actions"].append("backup %s (sha256 %s)" % (report["backup"], sha256_of(report["backup"])))
+            report["actions"].append("backup %s" % report["backup"])
         else:
             report["actions"].append("would back up before migrating from %s" % report["from_version"])
 
     if dry_run:
-        report["actions"].append("would create schema version %d" % SCHEMA_VERSION)
+        report["actions"].append(
+            "would create schema version %d" % SCHEMA_VERSION
+            if report["from_version"] is None
+            else "would upgrade %d -> %d" % (report["from_version"], SCHEMA_VERSION))
         return report
 
     conn = connect(path)
+    # A table rebuild needs foreign-key enforcement off (SQLite's documented
+    # procedure); the PRAGMA is a no-op inside a transaction, so it goes first.
+    rebuild = report["from_version"] == 1
+    if rebuild:
+        conn.execute("pragma foreign_keys = off")
     try:
         with conn:
-            for stmt in _DDL:
-                conn.execute(stmt)
-            conn.execute("pragma user_version = %d" % SCHEMA_VERSION)
             if report["from_version"] is None:
+                _create_v2(conn)
                 conn.execute(
                     "insert or ignore into versions(component, version, content_hash, note, created_at) "
-                    "values('schema', ?, ?, 'initial schema: translations, evidence, versions, id_map', ?)",
-                    (str(SCHEMA_VERSION), _schema_hash(), utc_stamp()),
+                    "values('schema', ?, ?, 'schema 2: dimension fields, provenance, governance tables', ?)",
+                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
                 )
+            elif report["from_version"] == 1:
+                for stmt in _TABLES_SHARED:
+                    conn.execute(stmt)
+                for stmt in _TABLES_V2:
+                    if "create table if not exists translations(" in stmt:
+                        continue          # created inside the rebuild, after the rename
+                    conn.execute(stmt)
+                _migrate_v1_to_v2(conn)
+                for stmt in _TRIGGERS_V2:
+                    conn.execute(stmt)
+                for stmt in _INDEXES_V2:
+                    if "translations" not in stmt:
+                        conn.execute(stmt)
+                conn.execute(
+                    "insert or ignore into versions(component, version, content_hash, note, created_at) "
+                    "values('schema', ?, ?, 'upgraded from schema 1', ?)",
+                    (str(SCHEMA_VERSION), _schema_hash(), utc_now()),
+                )
+            else:
+                raise RuntimeError("no migration path from schema %s" % report["from_version"])
+            conn.execute("pragma user_version = %d" % SCHEMA_VERSION)
             if data_version:
                 conn.execute(
                     "insert or ignore into versions(component, version, note, created_at) "
                     "values('dictionary', ?, 'recorded by the migration', ?)",
-                    (str(data_version), utc_stamp()),
+                    (str(data_version), utc_now()),
                 )
     finally:
         conn.close()
+    if rebuild:
+        conn = connect(path)
+        try:
+            violations = conn.execute("pragma foreign_key_check").fetchall()
+            report["foreign_key_violations"] = len(violations)
+        finally:
+            conn.close()
     report["actions"].append("schema version %d applied" % SCHEMA_VERSION)
     return report
 
 
+def origin_methods_note(origin_method):
+    """Provenance is unknown on legacy rows; keep the hint rather than dropping it."""
+    return origin_method if origin_method != "legacy_unknown" else None
+
+
 def rollback(path, backup_path, dry_run=False):
-    """Restore `path` from `backup_path`. Refuses anything outside the same dir."""
+    """Restore ``path`` from ``backup_path`` (same directory only)."""
     if not os.path.exists(backup_path):
         raise FileNotFoundError(backup_path)
     target_dir = os.path.dirname(os.path.abspath(path))
@@ -255,51 +408,19 @@ def rollback(path, backup_path, dry_run=False):
         raise ValueError("backup must live beside the database, in %s" % target_dir)
     if dry_run:
         return {"dry_run": True, "would_restore": backup_path, "into": path}
-    # Move the current file aside rather than deleting it: a failed rollback is
-    # reversible, and the operator can still inspect what was replaced.
     aside = None
     if os.path.exists(path):
         aside = "%s.rollback-%s" % (path, utc_stamp())
-        shutil.move(path, aside)
+        os.replace(path, aside)
     for suffix in ("-wal", "-shm"):
         side = path + suffix
         if os.path.exists(side):
             os.remove(side)
     shutil.copy2(backup_path, path)
-    return {
-        "restored": path,
-        "from": backup_path,
-        "previous_moved_to": aside,
-        "sha256": sha256_of(path),
-    }
+    return {"restored": path, "from": backup_path, "previous_moved_to": aside,
+            "snapshot": snapshot(path)}
 
 
 def _schema_hash():
-    payload = "\n".join(_DDL).encode("utf-8")
+    payload = ("\n".join(_TABLES_SHARED + _TABLES_V2 + _INDEXES_V2 + _TRIGGERS_V2)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:16]
-
-
-def snapshot(path):
-    """Logical fingerprint of a database: schema version + table inventory.
-
-    Used to prove a rollback restored the previous *content*; file hashes are
-    not a reliable signal because SQLite may rewrite page layout.
-    """
-    if not os.path.exists(path):
-        return None
-    conn = sqlite3.connect("file:%s?mode=ro" % path.replace("\\", "/"), uri=True)
-    try:
-        return {
-            "user_version": conn.execute("pragma user_version").fetchone()[0],
-            "tables": table_names(conn),
-            "counts": {
-                name: conn.execute("select count(*) from %s" % name).fetchone()[0]
-                for name in table_names(conn)
-            },
-        }
-    finally:
-        conn.close()
-
-
-def table_names(conn):
-    return [r[0] for r in conn.execute("select name from sqlite_master where type='table' order by name")]

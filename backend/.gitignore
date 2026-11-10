@@ -27,3 +27,7 @@ data/r3/
 data/r4/
 data/r5/
 data/backups/
+
+# Runtime state: never shipped, never pinned. AI answers are cached here so a
+# live request cannot change the fingerprint of data/build/dictionary.sqlite.
+data/runtime/

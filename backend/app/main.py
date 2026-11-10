@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import logging
+import os
+import sys
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
@@ -6,13 +11,43 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
+from app.core import ai_guard
 from app.core.config import settings
 from app.core.exceptions import ApiError
+
+logger = logging.getLogger("app.main")
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _requested_host() -> str:
+    """Best-effort read of the uvicorn --host actually requested."""
+    argv = sys.argv
+    for i, arg in enumerate(argv):
+        if arg == "--host" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--host="):
+            return arg.split("=", 1)[1]
+    return os.environ.get("UVICORN_HOST", "")
+
+
+def warn_if_exposed() -> None:
+    """Loud startup warning when the API may be reachable off-box without a secret."""
+    host = _requested_host()
+    secret_set = bool(ai_guard._shared_secret())
+    exposure = not host or host not in _LOOPBACK_HOSTS
+    if exposure and not secret_set:
+        logger.warning(
+            "AI endpoints may be reachable beyond loopback (host=%s) with no "
+            "AI_SHARED_SECRET configured. Set AI_SHARED_SECRET or bind 127.0.0.1.",
+            host or "unspecified",
+        )
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version=settings.version)
 
+    warn_if_exposed()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

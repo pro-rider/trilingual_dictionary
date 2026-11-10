@@ -1,9 +1,15 @@
-"""Persistent cache for AI-generated entries (Prompt 8: "never request twice").
+"""Persistent cache for AI-generated entries ("never request twice").
 
 AI answers cost money and take 3–10 s, so every successful generation is stored
-in the same SQLite file as the dictionary. A repeated lookup of the same word in
-the same direction is then a single indexed read (~0.5 ms) instead of an API
-call, and the answer stays available when a provider is rate-limited.
+so a repeated lookup of the same word in the same direction is a single indexed
+read (~0.5 ms) instead of an API call, and the answer stays available when a
+provider is rate-limited.
+
+The cache lives in its OWN SQLite file (``settings.ai_cache_path``), never in
+``dictionary.sqlite``. That file is a pinned, shipped asset whose fingerprint is
+checked by tests/test_execution_guards.py; a live request writing into it made
+the guard fail with a hash that changed on every AI lookup. Runtime data must
+not share a file with a shipped artifact.
 
 Nothing here is trusted as dictionary truth: cached rows keep
 `status = 'ai_generated'` and the API flags them `source="ai"`, `unverified=true`.
@@ -33,14 +39,24 @@ CREATE TABLE IF NOT EXISTS ai_cache (
 
 
 def _path() -> Path:
-    return Path(settings.dictionary_db_path)
+    """Resolve the runtime cache file, anchored to `backend/`, never to the cwd.
+
+    `settings.ai_cache_path` is relative by default; resolving it against the
+    process working directory means launching uvicorn from anywhere else creates
+    a stray database next to that folder, so a second copy of the cache silently
+    appears and the "never request twice" guarantee is lost.
+    """
+    p = Path(settings.ai_cache_path)
+    if p.is_absolute():
+        return p
+    return Path(__file__).resolve().parents[2] / p
 
 
 def _connect_rw() -> sqlite3.Connection:
-    """Open the dictionary read-write, creating the cache table if needed.
+    """Open the cache file read-write, creating it (and its table) if needed.
 
-    The file is created when absent so the cache also works on a machine that
-    has not built the dictionary yet (cache-only database).
+    The directory is created so the cache also works on a machine that has not
+    built the dictionary yet (cache-only database).
     """
     path = _path()
     path.parent.mkdir(parents=True, exist_ok=True)

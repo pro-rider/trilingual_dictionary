@@ -15,6 +15,7 @@ import re
 from typing import Any
 
 from app.core.config import settings
+from app.core import ai_guard
 from app.ai.base import LLMProvider
 from app.ai.failover import FailoverLLMService
 from app.ai.providers import GeminiProvider, OpenAICompatibleProvider
@@ -75,8 +76,16 @@ _service = _build_service()
 
 
 def ai_enabled() -> bool:
-    """True when the master switch is on AND at least one provider is keyed."""
-    return settings.ai_enabled and bool(_service.active_providers())
+    """True when the master switch is on AND at least one provider is keyed.
+
+    Also consults the runtime kill switch (P0.5), which is re-read on every call,
+    so an operator can stop spending without restarting the process. Placing the
+    check here — at the point where money is spent — keeps every call site and
+    every test that mocks a provider function unaffected.
+    """
+    return settings.ai_enabled and ai_guard.ai_runtime_enabled() and bool(
+        _service.active_providers()
+    )
 
 
 def provider_stats() -> dict:

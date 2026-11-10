@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 import sqlite3
 from functools import lru_cache
+
+from app.services.gloss import head_is_disqualified, normalize_gloss
 from pathlib import Path
 from typing import Any
 
@@ -116,9 +118,11 @@ def _gloss_score(gloss: str, queries: list[str]) -> int:
 
     A gloss like ``(bird species of China) Nepal fulvetta`` must NOT answer
     "Nepal": the word only appears inside a parenthetical explanation of a
-    different headword. So scoring only looks at the *definition part* (text
-    before the first bracket) and only at its leading segments, then at
-    whole-word occurrences there:
+    different headword. So scoring looks at the *definition part* only — but
+    the bracket may sit at either end of the gloss, so it is **stripped**
+    wherever it is (``gloss.normalize_gloss``) rather than truncated at the
+    first "(". Truncating made every ``(computing) database``-style sense score
+    zero, and those senses are the only answer for 1,481 query words.
 
     100  a segment IS the word (after stripping to/a/an/the)
      90  a segment starts with the word ("to arrange", "arrange; plan")
@@ -126,9 +130,11 @@ def _gloss_score(gloss: str, queries: list[str]) -> int:
      40  the word appears as a whole word in the definition part
       0  no defensible match -> the caller must return None, never a guess
     """
-    text = (gloss or "").strip().lower()
-    definition = text.split("(")[0]
-    segments = [s for s in re.split(r"[;,/]", definition) if s.strip()]
+    if head_is_disqualified(gloss or ""):
+        return 0
+    text = normalize_gloss(gloss)
+    definition = text
+    segments = [s for s in re.split(r"[;,/、]", definition) if s.strip()]
 
     best = 0
     for idx, segment in enumerate(segments):
@@ -195,6 +201,13 @@ def _best_english_row(con: sqlite3.Connection, q_lower: str) -> sqlite3.Row | No
         # #476 beats 品行 #35,279). `is_proper` is deliberately NOT used: the
         # build flags a whole entry when any sense is a name (水 carries a
         # surname sense, 书 an abbreviation sense), which made rare entries win.
+        #
+        # `sense_order` stays: on this corpus it is the only available proxy for
+        # "this entry's own primary meaning is this word", which is what a
+        # learner wants (行为 sense 0 = behavior, 行 sense 0 = to walk). It was
+        # removed in one experiment and three protected tests failed
+        # (toy→玩, raisin→提子, behaviors→行), while the benchmark stayed flat
+        # at 178/190 — so the signal is real and the loss is not.
         key = (
             _score_tier(score),
             row["sense_order"],

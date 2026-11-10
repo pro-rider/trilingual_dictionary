@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Merged SQLite dictionary built by tools/build_dictionary.py. Used as a
     # coverage fallback after the curated JSON fixture; ignored when missing.
     dictionary_db_path: str = "data/build/dictionary.sqlite"
+    # Runtime cache for AI answers. Deliberately NOT the dictionary file: that
+    # file is a pinned, shipped asset (ASSET-PINS.json), and letting a live
+    # request write to it silently changes the fingerprint of what we ship.
+    ai_cache_path: str = "data/runtime/ai_cache.sqlite"
     # Public base URL the client should use for image files served by /static.
     image_base_url: str = ""
     # Where fetch_images.py wrote the thumbnails/detail files.
@@ -30,6 +34,16 @@ class Settings(BaseSettings):
     # AI provider — never exposed to the Flutter app. Disabled by default.
     # Master switch: words missing from the dataset are generated on the fly.
     ai_enabled: bool = False
+
+    # ---- Runtime guards for the AI endpoints (task P0.5) ----
+    # Shared secret required in the X-AI-Token header on the AI routes. Empty =
+    # no requirement (the pre-P0.5 behaviour), so shipping this changes nothing
+    # until an operator sets it.
+    ai_shared_secret: str = ""
+    # In-memory quota. 0 = off. Values are also readable from the environment
+    # (AI_RATE_LIMIT_PER_MIN / AI_DAILY_CAP) so they can be changed live.
+    ai_rate_limit_per_min: int = 0
+    ai_daily_cap: int = 0
 
     # ---- Multi-provider LLM failover (priority: groq → gemini → openrouter) ----
     ai_providers_order: str = "groq,gemini,openrouter"

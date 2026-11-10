@@ -1,12 +1,17 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core import ai_guard
 from app.text_analysis.analyzer import analyze_text
 from app.text_analysis.schemas import AnalyzeTextRequest, AnalyzeTextResponse
 
 router = APIRouter(tags=["analyze"])
 
 
-@router.post("/analyze/text", response_model=AnalyzeTextResponse)
+@router.post(
+    "/analyze/text",
+    response_model=AnalyzeTextResponse,
+    dependencies=[Depends(ai_guard.require_ai_access), Depends(ai_guard.enforce_limits)],
+)
 def analyze(req: AnalyzeTextRequest) -> AnalyzeTextResponse:
     """Analyze a word / phrase / sentence / paragraph into per-unit meanings.
 

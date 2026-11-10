@@ -9,19 +9,37 @@ free and offline.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 MAX_ITEMS = 20
 
+# Per-field caps: the request is forwarded to a paid-or-free LLM, so an unbounded
+# string here is unbounded prompt cost. Generous for real glosses, fatal for abuse.
+MAX_KEY = 64
+MAX_GLOSS = 200
+
+_CONTROL_CHARS = dict.fromkeys(range(0x20), None)  # C0 controls incl. \n, \r, \t
+_CONTROL_CHARS.update(dict.fromkeys(range(0x7F, 0xA0), None))
+
+
+def _clean(v: str) -> str:
+    """Strip control characters and surrounding whitespace, keep printable text."""
+    return (v or "").translate(_CONTROL_CHARS).strip()
+
 
 class EnrichItem(BaseModel):
-    key: str
-    zh: str = ""
-    en: str = ""
+    key: str = Field(..., max_length=MAX_KEY)
+    zh: str = Field(default="", max_length=MAX_GLOSS)
+    en: str = Field(default="", max_length=MAX_GLOSS)
+
+    @field_validator("key", "zh", "en")
+    @classmethod
+    def _strip_controls(cls, v: str) -> str:
+        return _clean(v)
 
 
 class EnrichRequest(BaseModel):
-    items: list[EnrichItem] = Field(default_factory=list)
+    items: list[EnrichItem] = Field(default_factory=list, max_length=MAX_ITEMS)
 
 
 class EnrichItemOut(BaseModel):

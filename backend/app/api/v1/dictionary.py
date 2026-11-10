@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.ai.provider import enrich_senses_batch
+from app.core import ai_guard
 from app.schemas.dictionary import (
     MAX_ITEMS,
     EnrichItemOut,
@@ -11,7 +12,11 @@ from app.schemas.dictionary import (
 router = APIRouter(tags=["dictionary"])
 
 
-@router.post("/dictionary/enrich", response_model=EnrichResponse)
+@router.post(
+    "/dictionary/enrich",
+    response_model=EnrichResponse,
+    dependencies=[Depends(ai_guard.require_ai_access), Depends(ai_guard.enforce_limits)],
+)
 def enrich(req: EnrichRequest):
     """Fill the gaps CC-CEDICT leaves: Nepali gloss + one example sentence.
 

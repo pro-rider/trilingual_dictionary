@@ -62,7 +62,7 @@ class OfflineDictionary {
   /// Nothing the user owns is written into this file: AI glosses and AI example
   /// sentences live in [UserStore] (`user.db`), which this replacement never
   /// touches.
-  static const String assetVersion = '2026-11-09.3';
+  static const String assetVersion = 'db-e1118fb343';
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.

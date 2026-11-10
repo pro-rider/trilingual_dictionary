@@ -1,0 +1,20 @@
+{
+  "note": "Warnings that are correct by design, matched on table + column + row + exact value. A row whose text changes stops matching, so this file can never hide new corruption. Errors (U+FFFD, mojibake, NUL, control characters) have no override here: they must be repaired in the data.",
+  "schema": "encoding-allowlist-v1",
+  "entries": [
+    {
+      "table": "senses",
+      "column": "gloss_ne",
+      "row": 5090,
+      "value": "सूची अक्षर C",
+      "reason": "entry 丙 bing: the gloss deliberately names the Latin letter C, so a Latin character in a Nepali column is the point of the translation"
+    },
+    {
+      "table": "senses",
+      "column": "gloss_ne",
+      "row": 49650,
+      "value": "Zhuge Liang को सम्मान नाम",
+      "reason": "entry 孔明 kong ming: a proper name kept in Latin script; the surrounding Nepali carries the grammar"
+    }
+  ]
+}

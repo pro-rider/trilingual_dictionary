@@ -1,0 +1,91 @@
+{
+  "note": "Corrections for Nepali glosses damaged at write time. `old` is copied byte-for-byte from the pinned database by scripts/../tools gen_ne_corrections.py, so a drift stops the apply tool instead of overwriting silently. \"high\" = a single mechanism explains both the damage and the repair (corpus string, transliteration pattern, keystroke map). \"medium\"/\"low\" = the repair is a defensible reading, not a recovery, and is flagged needs_human so a Nepali reader can still overrule it.",
+  "schema": "ne-corrections-v1",
+  "generated_from": "backend/data/build/dictionary.sqlite",
+  "corrections": [
+    {
+      "sense_id": 109002,
+      "entry": "浇",
+      "pinyin": "jiao",
+      "gloss_en": "to pour liquid",
+      "old": "�लनु",
+      "new": "खन्याउनु",
+      "basis": "model_knowledge",
+      "evidence": "gloss_en is 'to pour liquid' (entry 浇 jiao). The stored value is U+FFFD + लनु, so the leading syllable is unrecoverable; no completion of '?लनु' is a pouring verb (फैलनु to spread, उम्लनु to boil). खन्याउनु is the standard Nepali verb for pouring a liquid. No corpus support existed for this verb (query for खन्याउ/पोख returned only पोखरी pond), so this is the one row that still needs a human reader.",
+      "confidence": "low",
+      "needs_human": true
+    },
+    {
+      "sense_id": 197466,
+      "entry": "鼓励",
+      "pinyin": "gu li",
+      "gloss_en": "to encourage",
+      "old": "�त्साहित गर्नु",
+      "new": "उत्साहित गर्नु",
+      "basis": "corpus_identical_string",
+      "evidence": "gloss_en 'to encourage' (鼓励). Stored 'U+FFFD + त्साहित गर्नु'. Both उत्साहित गर्नु and प्रोत्साहित गर्नु are grammatical, but उत्साहित गर्नु exists verbatim in the shipped corpus (sense 12575, 促使) and is the single-character completion, so the minimal-edit hypothesis wins. Alternative recorded for review.",
+      "confidence": "high",
+      "needs_human": false
+    },
+    {
+      "sense_id": 59001,
+      "entry": "帅",
+      "pinyin": "shuai",
+      "gloss_en": "surname Shuai",
+      "old": "शuai उपनाम",
+      "new": "शुआइ उपनाम",
+      "basis": "corpus_pattern",
+      "evidence": "gloss_en 'surname Shuai' (帅 shuai). Stored 'शuai उपनाम': Latin 'uai' typed inside a Devanagari word. The corpus transliterates surnames with Devanagari vowels in the same positions: 'surname Xiu' -> शिउ उपनाम, 'surname Yuan' -> युआन उपनाम, so uai -> ुआइ.",
+      "confidence": "high",
+      "needs_human": false
+    },
+    {
+      "sense_id": 66092,
+      "entry": "怪不得",
+      "pinyin": "guai bu de",
+      "gloss_en": "no wonder!",
+      "old": "केही आश्चर्य नै हoinu",
+      "new": "केही आश्चर्य नै होइन",
+      "basis": "keystroke_mapping",
+      "evidence": "gloss_en 'no wonder!' (怪不得). Stored 'केही आश्चर्य नै हoinu': the five Latin letters h-o-i-n-u sit where होइन belongs, and होइन is the standard negated copula. The corpus also carries अचम्म छैन for \"(it's) no wonder (that...)\".",
+      "confidence": "high",
+      "needs_human": false
+    },
+    {
+      "sense_id": 112935,
+      "entry": "灯",
+      "pinyin": "deng",
+      "gloss_en": "lamp",
+      "old": "बatti",
+      "new": "बत्ती",
+      "basis": "corpus_family",
+      "evidence": "gloss_en 'lamp' (灯 deng). Stored 'बatti' = Devanagari ब followed by Latin atti; 'batti' transliterates बत्ती, and the corpus already contains मोमबत्ती for candle.",
+      "confidence": "high",
+      "needs_human": false
+    },
+    {
+      "sense_id": 112963,
+      "entry": "灯笼",
+      "pinyin": "deng long",
+      "gloss_en": "lantern",
+      "old": "बatti",
+      "new": "बत्ती",
+      "basis": "corpus_family",
+      "evidence": "gloss_en 'lantern' (灯笼). Same stored value as 112935, i.e. one typed word reused. बत्ती covers a lantern as a light; a stricter form would be लल्टिन, which the corpus does not carry, so the minimal repair keeps बत्ती and is flagged for semantic review.",
+      "confidence": "medium",
+      "needs_human": true
+    },
+    {
+      "sense_id": 170710,
+      "entry": "追求",
+      "pinyin": "zhui qiu",
+      "gloss_en": "to pursue (a goal etc) stubbornly",
+      "old": "दृढतापूर्वक पурсnu",
+      "new": "दृढतापूर्वक पछ्याउनु",
+      "basis": "corpus_vocabulary",
+      "evidence": "gloss_en 'to pursue (a goal etc) stubbornly' (追求). Stored 'दृढतापूर्वक пурсnu' mixes Cyrillic п/у/р with Latin s/n/u, i.e. the English word 'pursue' half-typed. The Nepali verb for following/pursuing in the corpus is पछ्याउनु (sense for 'to follow'), so the phrase is rebuilt from project vocabulary rather than invented.",
+      "confidence": "medium",
+      "needs_human": true
+    }
+  ]
+}

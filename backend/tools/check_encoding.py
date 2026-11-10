@@ -81,16 +81,32 @@ def _text_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     return [r[1] for r in rows if (r[2] or "").upper().startswith("TEXT")]
 
 
-def check_database(path: Path, *, strict: bool = False) -> dict:
+def _load_allowlist(path: Path | None) -> list[dict]:
+    """Suppressions for warnings that are correct by design, never for errors."""
+    if path is None or not path.exists():
+        return []
+    with open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    entries = doc.get("entries") or []
+    for entry in entries:
+        for key in ("table", "column", "row", "value", "reason"):
+            if key not in entry:
+                raise SystemExit("allowlist entry missing %r: %r" % (key, entry))
+    return entries
+
+
+def check_database(path: Path, *, strict: bool = False,
+                   allowlist: list[dict] | None = None) -> dict:
     """Scan every TEXT cell of every ordinary table. Returns a JSON-ready report."""
     errors: list[dict] = []
     warns: list[dict] = []
+    allowed: list[dict] = []
     tables = 0
     cells = 0
 
     if not path.exists():
         return {"ok": False, "error": "database not found: %s" % path,
-                "errors": [], "warnings": [], "tables": 0, "cells": 0}
+                "errors": [], "warnings": [], "allowed": [], "tables": 0, "cells": 0}
 
     conn = sqlite3.connect("file:%s?mode=ro" % path.as_posix(), uri=True)
     try:
@@ -121,13 +137,26 @@ def check_database(path: Path, *, strict: bool = False) -> dict:
                     for severity, reason in inspect_text(value, column=column):
                         record = {"table": table, "column": column, "row": rowid,
                                   "reason": reason, "sample": value[:60]}
-                        (errors if severity == "error" else warns).append(record)
+                        if severity == "error":
+                            errors.append(record)
+                            continue
+                        # A suppression must match value and location exactly, so a
+                        # newly corrupted row cannot hide behind an old exception.
+                        match = next((a for a in (allowlist or [])
+                                      if a["table"] == table and a["column"] == column
+                                      and a["row"] == rowid and a["value"] == value), None)
+                        if match is not None:
+                            record["reason"] = reason
+                            record["allow_reason"] = match["reason"]
+                            allowed.append(record)
+                            continue
+                        warns.append(record)
     finally:
         conn.close()
 
     ok = not errors and (not strict or not warns)
     return {"ok": ok, "database": str(path), "errors": errors,
-            "warnings": warns, "tables": tables, "cells": cells,
+            "warnings": warns, "allowed": allowed, "tables": tables, "cells": cells,
             "strict": strict}
 
 
@@ -190,14 +219,21 @@ def main(argv: list[str] | None = None) -> int:
                        help="prove the detector catches known-bad input")
     parser.add_argument("--strict", action="store_true",
                         help="treat warnings (Latin in Nepali columns) as failures")
+    parser.add_argument("--allowlist", type=Path,
+                        default=BACKEND.parent / "docs" / "ENCODING-ALLOWLIST.json",
+                        help="warnings that are correct by design (matched by row and value)")
+    parser.add_argument("--no-allowlist", action="store_true",
+                        help="ignore the allowlist file; every warning counts")
     parser.add_argument("--json", type=Path, help="also write the report here")
     args = parser.parse_args(argv)
+
+    allow = [] if args.no_allowlist else _load_allowlist(args.allowlist)
 
     if args.selftest:
         report = selftest()
         ok = report["ok"]
     elif args.db:
-        report = check_database(args.db, strict=args.strict)
+        report = check_database(args.db, strict=args.strict, allowlist=allow)
         ok = report["ok"]
     else:
         report = {"ok": True, "files": []}

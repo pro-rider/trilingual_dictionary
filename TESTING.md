@@ -1,22 +1,44 @@
 # TESTING.md — Test & Quality Strategy
 
-Two suites, no CI. Everything below is runnable today on Windows.
+Two suites, both run in CI on every push to `main`.
 
 ```powershell
 $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\bin;$env:Path"
 
 # Flutter
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter analyze                 # 0 issues required
-flutter test                    # 19 tests, < 4 s
+flutter test                    # 73 tests
 
 # Backend
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
-.venv\Scripts\python.exe -m pytest -q     # 42 tests, ~1.6 s
+cd backend
+.venv\Scripts\python.exe -m pytest -q     # 244 tests
 ```
 
 `flutter` commands require git on `PATH` (`Unable to find git in your PATH`
 otherwise). No test needs the network, an API key, or Postgres.
+
+---
+
+## Dictionary data for tests
+
+The offline search, image and analyse suites need a real SQLite dictionary.
+Two files are used, in this order (`test/support/real_db.dart`):
+
+1. `backend/data/test_fixtures/dictionary_fixture.sqlite` — about 160 KB,
+   committed. Same schema as the production build, holding a curated subset of
+   real rows: the headwords the tests name, every entry that glosses a token the
+   analysis tests use (all candidates, so the ranking sees the same competition
+   as production), and the image rows behind 玩具/书/山/声音/册. Regenerate with
+   `python backend/tools/make_test_fixture.py`, which needs the full build. CI
+   uses this file, so those tests run there instead of being skipped.
+2. `backend/data/build/dictionary.sqlite` — about 96 MB, gitignored, produced by
+   `backend/tools/build_dictionary.py`. Used only when the fixture is absent, so
+   a developer with a full build still tests against the whole corpus.
+
+Paths resolve from the package root, so no test hardcodes a user directory and
+the same command works on Windows, macOS and Linux. If both files are missing,
+the suites skip with a message that names the command producing the data.
 
 ---
 

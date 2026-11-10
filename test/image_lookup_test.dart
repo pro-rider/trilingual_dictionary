@@ -6,8 +6,8 @@ import 'package:trilingual_dictionary/data/local/offline_dictionary.dart';
 import 'support/real_db.dart';
 
 void main() {
-  final dbPath = realDictionaryPath();
-  final noDb = missingRealDictionary();
+  final dbPath = testDictionaryPath();
+  final noDb = missingTestDictionary();
 
   setUpAll(() {
     sqfliteFfiInit();

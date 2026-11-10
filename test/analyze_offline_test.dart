@@ -13,8 +13,8 @@ import 'support/real_db.dart';
 /// real database, i.e. exactly the data the phone carries, and skip when it has
 /// not been built on this machine (it is gitignored, so CI never has it).
 void main() {
-  final dbPath = realDictionaryPath();
-  final noDb = missingRealDictionary();
+  final dbPath = testDictionaryPath();
+  final noDb = missingTestDictionary();
 
   late OfflineDictionary dict;
 

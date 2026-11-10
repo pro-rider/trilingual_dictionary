@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -13,7 +11,7 @@ import 'support/real_db.dart';
 /// uses. Skipped when the built database is not on this machine (it is
 /// gitignored, so a fresh clone has no data until `build_dictionary.py` runs).
 void main() {
-  final dbPath = realDictionaryPath();
+  final dbPath = testDictionaryPath();
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -21,8 +19,8 @@ void main() {
   });
 
   test('English headword resolves through a sense gloss', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -35,8 +33,8 @@ void main() {
   });
 
   test('Chinese lookup returns pinyin and the HSK5-tagged word', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -49,8 +47,8 @@ void main() {
   });
 
   test('pinyin without tones finds the entry', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -60,8 +58,8 @@ void main() {
   });
 
   test('country names resolve to the country, not to a species', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -75,8 +73,8 @@ void main() {
   });
 
   test('plural query falls back to the singular headword', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -95,8 +93,8 @@ void main() {
   });
 
   test('enrichment is a no-op when the backend is unreachable', () async {
-    if (!File(dbPath).existsSync()) {
-      markTestSkipped('dictionary.sqlite not built on this machine');
+    if (missingTestDictionary()) {
+      markTestSkipped(kMissingDictionarySkip);
       return;
     }
     final dict = OfflineDictionary(overridePath: dbPath);

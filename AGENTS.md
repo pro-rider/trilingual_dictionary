@@ -185,6 +185,22 @@ Before any migration or bulk write (not for ordinary code edits):
 .venv\Scripts\python.exe tools\check_encoding.py --db data\build\dictionary.sqlite   # when text columns are touched
 ```
 
+Text repairs are two edits, never one. `dictionary.sqlite` is authoritative for
+legacy Nepali, and `translations.db` keeps an import copy that
+`tests/test_resolution.py` compares against:
+
+```powershell
+.venv\Scripts\python.exe tools\apply_ne_corrections.py                  # dry run, refuses on drift
+.venv\Scripts\python.exe tools\apply_ne_corrections.py --apply --backup "path\to\before-copy"
+.venv\Scripts\python.exe tools\sync_legacy_translation_text.py          # dry run
+.venv\Scripts\python.exe tools\sync_legacy_translation_text.py --apply --backup "path\to\store-copy"
+.venv\Scripts\python.exe tools\pack_asset.py                            # rebuild the shipped .gz
+```
+
+Each refuses to write unless the backup is byte-identical, the recorded `old`
+value is still stored, and every unrelated row is unchanged afterwards. Re-running
+is idempotent. `docs/DATA-REPAIR-2026-11-10.md` is a worked example.
+
 Both print a JSON run-log and exit non-zero when the gate fails. `PROTOCOL.md`
 explains which rule each one enforces.
 

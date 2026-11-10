@@ -15,6 +15,13 @@
       "row": 49650,
       "value": "Zhuge Liang को सम्मान नाम",
       "reason": "entry 孔明 kong ming: a proper name kept in Latin script; the surrounding Nepali carries the grammar"
+    },
+    {
+      "table": "examples",
+      "column": "ne",
+      "row": 391,
+      "value": "वैज्ञानिकले जेललाई -20°C मा जमेको राखे।",
+      "reason": "example for 凝胶: the Latin characters are the temperature unit -20°C, which the sentence is about; removing them would change the meaning"
     }
   ]
 }

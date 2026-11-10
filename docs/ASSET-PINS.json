@@ -3,15 +3,16 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "3f9e5f464f18aa75638c7c95ba21b333eb3a42e33783ff9de21b01ec39f171f3",
+      "sha256": "e1118fb34392b462947b0501ad801365729a23869d265de6887588c2a99bfac1",
       "bytes": 100765696,
-      "approved_by": "unchanged asset; restored 2026-11-10 to the exact build this pin records, from assets/data/dictionary.sqlite.gz, which decompresses to this sha256. Verified before and after: entries/senses/images/entry_images/concepts/entry_concepts/examples row hashes identical to the pre-restore file, so no content moved. Provenance note: this pinned build already contained 1 ai_cache row, i.e. runtime data was shipped inside the pinned file from the start; the cache now writes to data/runtime/ai_cache.sqlite so it cannot drift again. The 'bytes' figure was previously recorded as 100769792, which never matched this file (the guard compares sha256 only); corrected here to the measured size. Approval relied on: 'Asset pin: yes, \"do the pin properly\".'",
+      "approved_by": "approved asset change, 2026-11-10: eight rows of damaged Nepali text repaired (2 rows carrying U+FFFD, 6 rows with Latin or Cyrillic characters typed inside Devanagari words), recorded row-by-row with evidence in docs/NE-CORRECTIONS.json and applied by backend/tools/apply_ne_corrections.py. Previous pin 3f9e5f46... was the unmodified build; this pin is the same build after those eight values changed. Row counts are unchanged in every table (verified by digest over all other rows per column, plus per-table counts), integrity_check and foreign_key_check pass, and the encoding gate goes from 2 errors + 9 warnings to 0 errors + 0 warnings (3 legitimate mixed-script rows allowlisted in docs/ENCODING-ALLOWLIST.json). Approval relied on: 'ok go ahead and fixes and go further'. Evidence run-logs: ne_apply.json (7 rows) and ne_apply2.json (example row 35). assets/data/dictionary.sqlite.gz was rebuilt from this file and verified to decompress back to this exact sha256.",
       "known_defect": "fts_zh missing entry ids 123597-123672 (76 rows) — accepted until an approved rebuild"
     },
     {
       "path": "backend/data/build/translations.db",
-      "sha256": "2a6e428467b611f15ab954084b83fe4a4d81181c9250c2b00dc7ce69566cf036",
-      "approved_by": "phase2.1 schema-4 migration, 3,245 legacy rows",
+      "sha256": "f3b9f3140b72517feaf5d6c7e375d129af820d12c0807e0611194dae44d5abd6",
+      "bytes": 3252224,
+      "approved_by": "approved asset change, 2026-11-10: the same eight corrections propagated into the legacy import copy (origin_source='dictionary.sqlite:senses.ne'), because dictionary.sqlite is the authoritative original for legacy Nepali text (docs/PHASE2.1-CORRECTIONS.md) and tests/test_resolution.py fails when the two diverge. Seven senses rows had their text replaced by backend/tools/sync_legacy_translation_text.py; identity and every governance column are untouched, row count stays 3,245, no supersessions created, all 3,238 other rows proven unchanged by digest, integrity_check ok. The eighth correction (examples row 35) has no counterpart in this store, which imports senses only. Previous pin 2a6e4284...",
       "known_defect": null
     }
   ]

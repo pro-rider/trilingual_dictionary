@@ -1,7 +1,7 @@
 """Repair the broken image paths using bytes already on disk.
 
 Why this exists: 65 `images.thumb_path` / `detail_path` rows hold absolute build
-machine paths (`C:/Users/<name>/Desktop/...`). `images.py::_relative`
+machine paths (`<home>/Desktop/...`). `images.py::_relative`
 strips only the `data/images/` prefix, so an absolute path is returned whole and
 the public URL leaks the build machine's username and directory layout — and the
 URL never resolves. Meanwhile the real bytes are sitting in the repo at

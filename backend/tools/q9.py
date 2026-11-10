@@ -1,6 +1,7 @@
 import sqlite3
+from pathlib import Path
 
-DB = r"C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite"
+DB = Path(__file__).resolve().parents[1] / "data" / "build" / "dictionary.sqlite"
 con = sqlite3.connect(DB)
 print("mountain entry 35110 senses:",
       con.execute("SELECT sense_id, gloss_en FROM senses WHERE entry_id=35110").fetchall())

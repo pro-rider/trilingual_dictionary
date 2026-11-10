@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-ROOT = Path(r"C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary")
+ROOT = Path(__file__).resolve().parents[2]
 DB = ROOT / "backend" / "data" / "build" / "dictionary.sqlite"
 con = sqlite3.connect(DB)
 rows = con.execute(

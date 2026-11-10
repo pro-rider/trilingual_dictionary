@@ -170,7 +170,7 @@ are the app's current non-negotiable stack for this phase.
 
 ```powershell
 $env:Path = "C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\bin;$env:Path"
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter analyze            # must print "No issues found!"
 flutter test               # must pass
 cd backend

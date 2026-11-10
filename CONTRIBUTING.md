@@ -32,7 +32,7 @@ flutter --version
 ## 2. First-time setup
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter pub get
 
 cd backend
@@ -60,13 +60,13 @@ For AI features set `AI_ENABLED=true` and provide one key
 
 ```powershell
 # backend (must be started from the backend\ directory: DATASET_PATH is relative)
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
+cd backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 # → http://127.0.0.1:8000/docs
 # → http://127.0.0.1:8000/api/v1/health
 
 # app
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter run                                            # desktop target, 127.0.0.1:8000
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android emulator
 ```
@@ -101,7 +101,7 @@ Windows desktop builds need two machine-level prerequisites that are easy to tri
 ## 4. Checks before every commit
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter analyze          # must be: No issues found!
 flutter test             # must pass
 dart format --output=none --set-exit-if-changed lib test

@@ -11,8 +11,9 @@ import sqlite3
 import sys
 
 from app.services import sqlite_dataset as sd
+from pathlib import Path
 
-DB = r"C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite"
+DB = Path(__file__).resolve().parents[1] / "data" / "build" / "dictionary.sqlite"
 ARTICLES = ("to ", "a ", "an ", "the ")
 
 

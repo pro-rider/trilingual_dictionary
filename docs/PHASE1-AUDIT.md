@@ -1,6 +1,6 @@
 # Phase 1 audit — Nepali data quality and coverage
 
-Read-only pass over `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite` at 2026-11-09T08:25:27+00:00.
+Read-only pass over `backend/data/build/dictionary.sqlite` at 2026-11-09T08:25:27+00:00.
 
 ## Totals
 

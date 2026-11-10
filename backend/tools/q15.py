@@ -1,6 +1,7 @@
 import sqlite3
+from pathlib import Path
 
-DB = r"C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite"
+DB = Path(__file__).resolve().parents[1] / "data" / "build" / "dictionary.sqlite"
 con = sqlite3.connect(DB)
 for w in ("光", "书", "声音", "玩具", "山", "水", "老师", "狗"):
     rows = con.execute(

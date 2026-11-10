@@ -144,7 +144,7 @@ Measure-Command {
 ### App startup & frames (device only)
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter run --profile -d <device-id>
 # then, in DevTools: Performance → frame chart, and
 adb shell dumpsys gfxinfo com.example.trilingual_dictionary reset

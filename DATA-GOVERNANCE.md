@@ -148,7 +148,7 @@ keeps them for display.
 ## 6. Validation gate
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
+cd backend
 .venv\Scripts\python.exe -m scripts.validate_dataset
 # → "OK: dataset integrity valid."  (exit 0)
 ```

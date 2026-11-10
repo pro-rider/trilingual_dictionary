@@ -11,8 +11,8 @@ meanings and aligned example sentences in all three languages. Nepali is output-
 
 | Part | Path | Git |
 |---|---|---|
-| Flutter app | `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary` | repo `github.com/pro-rider/trilingual_dictionary`, branch `main` |
-| FastAPI backend | `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend` | tracked in this repo as `backend/` |
+| Flutter app | repository root | repo `github.com/pro-rider/trilingual_dictionary`, branch `main` |
+| FastAPI backend | `backend/` | tracked in this repo as `backend/` |
 
 Toolchain on this machine (neither is on PATH by default):
 
@@ -29,7 +29,7 @@ Flutter needs `git.exe` on PATH even to run `flutter analyze` — without it: *"
 ### Backend (FastAPI, port 8000)
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
+cd backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 ```
 
@@ -41,7 +41,7 @@ Swagger: http://127.0.0.1:8000/docs · Health: http://127.0.0.1:8000/api/v1/heal
 ### App
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 flutter run                                      # desktop/emulator
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android emulator → host backend
 ```
@@ -400,7 +400,7 @@ if `git status --short` ever shows them, fix `.gitignore` before committing.
 ### 8.1 Run the backend
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend
+cd backend
 .venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -413,7 +413,7 @@ Restart after editing anything under `app/` (no `--reload` by default).
 ### 8.2 Run the app
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 $env:Path = "$env:LOCALAPPDATA\Programs\nuget;C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;C:\flutter\bin;$env:Path"
 flutter run -d windows                                            # desktop
 flutter run -d <device-id>                                        # phone (USB)
@@ -572,7 +572,7 @@ cd ...;          flutter analyze
 ### 8.10 Commit and push
 
 ```powershell
-cd C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary
+cd trilingual_dictionary
 git status --short
 git add -A
 git -c user.name="pro-rider" -c user.email="pro-rider@users.noreply.github.com" commit -m "<type>(<area>): <what changed>"

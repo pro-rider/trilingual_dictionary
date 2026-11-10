@@ -1,6 +1,7 @@
 import sqlite3
+from pathlib import Path
 
-DB = r"C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite"
+DB = Path(__file__).resolve().parents[1] / "data" / "build" / "dictionary.sqlite"
 con = sqlite3.connect(DB)
 print("images", con.execute("SELECT COUNT(*) FROM images").fetchone()[0])
 print("entry_images", con.execute("SELECT COUNT(*) FROM entry_images").fetchone()[0])

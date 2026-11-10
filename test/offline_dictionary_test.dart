@@ -7,12 +7,13 @@ import 'package:trilingual_dictionary/core/normalizer.dart';
 import 'package:trilingual_dictionary/data/api_client.dart';
 import 'package:trilingual_dictionary/data/local/offline_dictionary.dart';
 
+import 'support/real_db.dart';
+
 /// Runs the real bundled database through the exact search code the phone
 /// uses. Skipped when the built database is not on this machine (it is
 /// gitignored, so a fresh clone has no data until `build_dictionary.py` runs).
 void main() {
-  final dbPath =
-      r'C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite';
+  final dbPath = realDictionaryPath();
 
   setUpAll(() {
     sqfliteFfiInit();

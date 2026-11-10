@@ -3,14 +3,16 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:trilingual_dictionary/core/normalizer.dart';
 import 'package:trilingual_dictionary/data/local/offline_dictionary.dart';
 
+import 'support/real_db.dart';
+
 /// Pasting a long paragraph used to land on `/analyze`, which only the backend
 /// can answer — offline the user saw "Analysis needs the server", an error
 /// screen with nothing in it. These tests run the offline analyser against the
-/// real 96 MB database, i.e. exactly the data the phone carries.
+/// real database, i.e. exactly the data the phone carries, and skip when it has
+/// not been built on this machine (it is gitignored, so CI never has it).
 void main() {
-  const dbPath =
-      r'C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary'
-      r'\backend\data\build\dictionary.sqlite';
+  final dbPath = realDictionaryPath();
+  final noDb = missingRealDictionary();
 
   late OfflineDictionary dict;
 
@@ -42,7 +44,7 @@ void main() {
     expect(word.wordZh, isNotEmpty, reason: 'word → 词/单词');
     expect(word.pinyin, isNotEmpty, reason: 'the analysis shows pinyin');
     expect(word.source, 'dataset');
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('function words do not become dictionary cards', () async {
     const text = 'The dog is in the house and it has a book.';
@@ -53,7 +55,7 @@ void main() {
         containsAll(['the', 'is', 'in', 'and', 'a']));
     expect(result.words.any((s) => s.surface == 'dog'), isTrue);
     expect(result.words.any((s) => s.surface == 'book'), isTrue);
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('Chinese text is segmented by longest match', () async {
     const text = '我们爬了那座山。';
@@ -64,7 +66,7 @@ void main() {
     expect(meanings, isNotEmpty, reason: '山 and 我们 must resolve');
     expect(result.segments.any((s) => s.surface == '山'), isTrue,
         reason: '山 is a single-character entry');
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('very long pastes are cut, and say so, instead of erroring', () async {
     final text = List.filled(400, 'water').join(' ');
@@ -76,5 +78,7 @@ void main() {
         reason: 'the banner must explain the cut, not just drop text');
     expect(result.segments.any((s) => s.hasMeaning), isTrue,
         reason: 'the first 300 units still get their meanings');
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  },
+      skip: noDb ? kMissingDictionarySkip : null,
+      timeout: const Timeout(Duration(minutes: 3)));
 }

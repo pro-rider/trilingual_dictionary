@@ -3,9 +3,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:trilingual_dictionary/core/normalizer.dart';
 import 'package:trilingual_dictionary/data/local/offline_dictionary.dart';
 
+import 'support/real_db.dart';
+
 void main() {
-  final dbPath =
-      r'C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite';
+  final dbPath = realDictionaryPath();
+  final noDb = missingRealDictionary();
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -22,7 +24,7 @@ void main() {
     expect(image, isNotNull);
     expect(image!.assetPath, endsWith('.webp'));
     await dict.close();
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('entry ids from search are usable as image keys', () async {
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -38,7 +40,7 @@ void main() {
       expect(image, isNotNull, reason: '$word should carry a thumbnail');
     }
     await dict.close();
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('quarantined examples never reach the reader', () async {
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -55,7 +57,7 @@ void main() {
       }
     }
     await dict.close();
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 
   test('headword lookup covers entries whose id is not a local row', () async {
     final dict = OfflineDictionary(overridePath: dbPath);
@@ -69,5 +71,5 @@ void main() {
     }
     expect(await dict.imageForWord('册'), isNotNull);
     await dict.close();
-  });
+  }, skip: noDb ? kMissingDictionarySkip : null);
 }

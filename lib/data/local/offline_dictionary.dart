@@ -230,13 +230,16 @@ class OfflineDictionary {
         if (score < 40) continue;
         // Rank the way a learner expects. Score first, but banded so usage can
         // decide between "the definition IS this word" (100) and "this word is
-        // one of its definitions" (85). Then the sense number — surname and
-        // abbreviation senses were demoted to the end of each entry
-        // (backend/tools/reorder_senses.py), so sense 0 is the real meaning.
-        // Then how often the word is really used (wordfreq: 水 #653 beats 四大
-        // #4,622; 书 #539 beats 册 #4,264; 行为 #476 beats 品行 #35,279).
+        // one of its definitions" (85). Then how often the word is really used
+        // (wordfreq: 水 #653 beats 四大 #4,622; 书 #539 beats 册 #4,264).
         // `is_proper` is deliberately NOT used: the build flags a whole entry
         // when any sense is a name (水 carries a surname sense).
+        //
+        // `sense_order` stays: here it is the only proxy for "this entry's own
+        // primary meaning is this word" (行为 sense 0 = behavior, 行 sense 0 =
+        // to walk). Removing it failed three protected tests (toy→玩,
+        // raisin→提子, behaviors→行) with no benchmark gain.
+        // Mirrors backend/app/services/sqlite_dataset.py::_best_english_row.
         final freq = row['freq_rank'] as int?;
         final key = <int>[
           _scoreTier(score),
@@ -298,18 +301,52 @@ class OfflineDictionary {
     return p;
   }
 
+  /// Removes parenthetical / bracketed tags wherever they occur and keeps the
+  /// definition text.
+  ///
+  /// Scoring used to do `gloss.split('(').first`, which assumes a bracket only
+  /// ever appears *after* a definition. CC-CEDICT does the opposite for most
+  /// domain-tagged senses — "(computing) database", "(lit. and fig.) to
+  /// pollute" — so those definitions became empty strings, scored 0, and could
+  /// never answer a query. 17,908 senses (9.03%) open with a bracket.
+  ///
+  /// Mirrors `backend/app/services/gloss.py::normalize_gloss`; a parity test
+  /// pins both against the same fixtures.
+  static String normalizeGloss(String gloss) {
+    var out = gloss;
+    for (var pass = 0; pass < 2; pass++) {
+      out = out.replaceAll(RegExp(r'\([^()]*\)'), ' ');
+      out = out.replaceAll(RegExp(r'（[^（）]*）'), ' ');
+      out = out.replaceAll(RegExp(r'\[[^\[\]]*\]'), ' ');
+    }
+    return out.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+  }
+
+  /// True when the gloss opens with a tag that rules the head out as an answer.
+  ///
+  /// 中 is "(bound form) China; Chinese" — a bound morpheme, so it must never
+  /// answer the query "China" (that is 中国). Mirrors
+  /// `backend/app/services/gloss.py::head_is_disqualified`.
+  static bool _headIsDisqualified(String gloss) {
+    final m = RegExp(r'^\s*\(([^()]*)\)').firstMatch(gloss);
+    if (m == null) return false;
+    final tag = m.group(1)!.trim().toLowerCase();
+    return tag.startsWith('bound form') || tag.startsWith('abbr');
+  }
+
   /// How well an English gloss defines the typed word.
   ///
-  /// Only the definition part (before the first bracket) counts, so
-  /// "(bird species of China) Nepal fulvetta" cannot answer "Nepal":
+  /// Only the definition part counts, so "(bird species of China) Nepal
+  /// fulvetta" cannot answer "Nepal"; but the tag is *stripped*, not
+  /// truncated at, wherever it sits:
   ///  100 a segment IS the word   90 a segment starts with it
   ///   60 the word ends a segment  40 whole word somewhere in the definition
   ///    0 no defensible match → return nothing, never a guess
   static int _glossScore(String gloss, List<String> queries) {
-    final text = gloss.trim().toLowerCase();
-    final definition = text.split('(').first;
+    if (_headIsDisqualified(gloss)) return 0;
+    final definition = normalizeGloss(gloss);
     final segments = definition
-        .split(RegExp(r'[;,/]'))
+        .split(RegExp(r'[;,/、]'))
         .where((s) => s.trim().isNotEmpty)
         .toList();
     var best = 0;

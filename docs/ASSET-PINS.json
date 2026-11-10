@@ -4,8 +4,8 @@
     {
       "path": "backend/data/build/dictionary.sqlite",
       "sha256": "3f9e5f464f18aa75638c7c95ba21b333eb3a42e33783ff9de21b01ec39f171f3",
-      "bytes": 100769792,
-      "approved_by": "phase2.1 baseline (773625f), unchanged through 2026-11-09",
+      "bytes": 100765696,
+      "approved_by": "unchanged asset; restored 2026-11-10 to the exact build this pin records, from assets/data/dictionary.sqlite.gz, which decompresses to this sha256. Verified before and after: entries/senses/images/entry_images/concepts/entry_concepts/examples row hashes identical to the pre-restore file, so no content moved. Provenance note: this pinned build already contained 1 ai_cache row, i.e. runtime data was shipped inside the pinned file from the start; the cache now writes to data/runtime/ai_cache.sqlite so it cannot drift again. The 'bytes' figure was previously recorded as 100769792, which never matched this file (the guard compares sha256 only); corrected here to the measured size. Approval relied on: 'Asset pin: yes, \"do the pin properly\".'",
       "known_defect": "fts_zh missing entry ids 123597-123672 (76 rows) — accepted until an approved rebuild"
     },
     {

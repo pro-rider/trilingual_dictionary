@@ -25,6 +25,11 @@ jobs:
         run: python tools/check_translation_golden.py
       - name: Test suite
         run: python -m pytest -q
+      - name: Encoding detector proves it bites (PROTOCOL.md rule 3)
+        run: python tools/check_encoding.py --selftest
+      - name: Encoding gate on the built asset (rule 9)
+        if: ${{ hashFiles('backend/data/build/dictionary.sqlite') != '' }}
+        run: python tools/check_encoding.py --db data/build/dictionary.sqlite
       - name: FTS exact-ID gate on the built asset
         if: ${{ hashFiles('backend/data/build/dictionary.sqlite') != '' }}
         run: python tools/validate_fts.py --db data/build/dictionary.sqlite

@@ -8,6 +8,7 @@ Companion documents — read the one that matches the task, not all of them:
 
 | Task | Read |
 |---|---|
+| Any non-trivial task (migration, bulk write, a number used for a decision) | `PROTOCOL.md` |
 | Understanding the system | `ARCHITECTURE.md` |
 | Config / env vars | `ENV-CONTRACTS.md` |
 | "What breaks if I change X?" | `IMPACT-MAP.md` |
@@ -177,6 +178,16 @@ cd backend
 .venv\Scripts\python.exe -m pytest -q    # must pass
 ```
 
+Before any migration or bulk write (not for ordinary code edits):
+
+```powershell
+.venv\Scripts\python.exe tools\preflight.py --intent "one line: what this run will change" --backup "path\to\before-copy"
+.venv\Scripts\python.exe tools\check_encoding.py --db data\build\dictionary.sqlite   # when text columns are touched
+```
+
+Both print a JSON run-log and exit non-zero when the gate fails. `PROTOCOL.md`
+explains which rule each one enforces.
+
 Nothing is "done" until these pass. If your change touches an endpoint, also
 exercise it (see `TESTING.md` §7) and paste the observed output in your report.
 
@@ -211,4 +222,6 @@ Until fixed, treat these as documented, not as new findings:
 - Favorites sync writes directly to Supabase from the app; the backend
   `/favorites` endpoints exist but the app does not use them.
 - `GROQ_API_KEY` is empty; the legacy `AI_API_KEY` is used for Groq.
-- Git has no CI; checks are manual.
+- CI (`.github/workflows/contracts.yml`) runs both suites plus the golden-vector,
+  encoding and pin gates, but the full 96 MB dictionary is not built there, so the
+  asset-level gates (encoding/`validate_fts` over the real DB) only run locally.

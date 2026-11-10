@@ -20,7 +20,11 @@ def _stub_draft(word: str, lang: str) -> dict[str, str]:
 
 
 def test_unknown_word_returns_ai_entry_and_caches(monkeypatch, tmp_path):
+    # Isolate BOTH stores: the dictionary fallback and the runtime AI cache. The
+    # cache is its own file now, so pointing only at the dictionary would leave
+    # this reading rows cached by an earlier run (first.cached would be True).
     monkeypatch.setattr(settings, "dictionary_db_path", str(tmp_path / "d.sqlite"))
+    monkeypatch.setattr(settings, "ai_cache_path", str(tmp_path / "cache.sqlite"))
     sqlite_dataset.reset_cache()
     monkeypatch.setattr(search, "generate_draft", _stub_draft)
 
@@ -58,7 +62,11 @@ def test_known_word_keeps_dictionary_source(monkeypatch):
 
 
 def test_ai_cache_stats(tmp_path, monkeypatch):
+    # The cache has its own file now (settings.ai_cache_path), separate from the
+    # pinned dictionary. Both must point at the temp dir, or this test would read
+    # the real runtime cache and count rows left behind by earlier tests.
     monkeypatch.setattr(settings, "dictionary_db_path", str(tmp_path / "s.sqlite"))
+    monkeypatch.setattr(settings, "ai_cache_path", str(tmp_path / "cache.sqlite"))
     assert ai_cache.put("x", "en", {"meaning_en": "x"}) is True
     ai_cache.get("x", "en")
     assert ai_cache.stats()["rows"] == 1

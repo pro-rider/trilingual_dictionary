@@ -525,8 +525,37 @@ class OfflineDictionary {
   }) async {
     final db = await _open();
     if (db == null) {
-      return AnalyzedText(text: text, error: 'Offline dictionary unavailable');
+      // degraded must be set here: the analyse screen renders its explanatory
+      // banner only when degraded is true, so returning an empty result with
+      // degraded=false leaves the user looking at their own text and nothing
+      // else, with no hint that the dictionary could not be opened.
+      return AnalyzedText(
+        text: text,
+        degraded: true,
+        error: 'Offline dictionary unavailable — the bundled dictionary could '
+            'not be opened on this device. Check the app data or reinstall.',
+      );
     }
+    try {
+      return await _analyzeWithOpenDb(db, text, lang, maxUnits);
+    } catch (e) {
+      // sqflite opens lazily, so a damaged or missing file only fails on the
+      // first query — that exception used to escape to the UI as an error
+      // screen. Degrading here keeps the pasted text on screen with a reason.
+      _lastError = e;
+      return AnalyzedText(
+        text: text,
+        degraded: true,
+        error: 'Offline dictionary could not be read — the bundled database is '
+            'missing or damaged. Reinstall the app to restore it.',
+      );
+    }
+  }
+
+  /// The analysis itself, extracted so [analyzeOffline] can degrade instead of
+  /// throwing when the database turns out to be unreadable.
+  Future<AnalyzedText> _analyzeWithOpenDb(
+      Database db, String text, InputLanguage lang, int maxUnits) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
       return const AnalyzedText(error: 'Nothing to analyse');

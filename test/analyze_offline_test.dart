@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:trilingual_dictionary/core/normalizer.dart';
@@ -81,4 +83,26 @@ void main() {
   },
       skip: noDb ? kMissingDictionarySkip : null,
       timeout: const Timeout(Duration(minutes: 3)));
+
+  // Runs everywhere, including a clone with no built dictionary: it only needs
+  // a file that cannot be opened as SQLite. This is the branch that used to
+  // return an empty result with degraded=false, which rendered the source text
+  // and nothing else — no words, no explanation.
+  test('an unopenable dictionary degrades with an explanation, not a blank screen',
+      () async {
+    final tmp = await Directory.systemTemp.createTemp('dict-unavailable');
+    final bogus = File('${tmp.path}/not-a-database.sqlite');
+    bogus.writeAsStringSync('this is not a sqlite file');
+    final broken = OfflineDictionary(overridePath: bogus.path);
+    final result =
+        await broken.analyzeOffline('The dog is in the house.', InputLanguage.english);
+
+    expect(result.segments, isEmpty);
+    expect(result.degraded, isTrue,
+        reason: 'the screen renders its banner only when degraded is true');
+    expect(result.error, contains('dictionary'),
+        reason: 'the banner text must name the cause the user can act on');
+    await broken.close();
+    await tmp.delete(recursive: true);
+  });
 }

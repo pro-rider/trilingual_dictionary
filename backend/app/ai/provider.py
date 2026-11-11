@@ -17,8 +17,14 @@ from typing import Any
 from app.core.config import settings
 from app.core import ai_guard
 from app.ai.base import LLMProvider
-from app.ai.failover import FailoverLLMService
+from app.ai.failover import FailoverLLMService        # legacy, still importable
 from app.ai.providers import GeminiProvider, OpenAICompatibleProvider
+from app.ai.breaker import BreakerBoard
+from app.ai.discovery import refresh
+from app.ai.free_providers import build_caller
+from app.ai.quota import QuotaTracker, default_state_file
+from app.ai.registry import build_registry, set_credentials
+from app.ai.router import FreeOnlyRouter, RouterConfig
 
 _DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 
@@ -56,7 +62,7 @@ def _build_providers() -> list[LLMProvider]:
     ]
 
 
-def _build_service() -> FailoverLLMService:
+def _legacy_service() -> FailoverLLMService:
     order = [
         s.strip().lower()
         for s in settings.ai_providers_order.split(",")
@@ -72,7 +78,54 @@ def _build_service() -> FailoverLLMService:
     )
 
 
+def _build_service() -> FreeOnlyRouter:
+    """Build the strict free-only chain from the 20-slot registry.
+
+    Model IDs are re-verified against the OpenRouter catalogue (cached), so a
+    retired or newly-priced free model is demoted instead of silently retried.
+    """
+    catalog = refresh(enabled=getattr(settings, "ai_model_discovery_enabled", True),
+                      interval_hours=float(getattr(settings,
+                                                    "ai_model_discovery_interval_hours", 24)))
+    set_credentials({
+        "groq": settings.groq_api_key or settings.ai_api_key,
+        "gemini": settings.gemini_api_key,
+        "openrouter": settings.openrouter_api_key,
+    })
+    endpoints = build_registry(
+        free_models=catalog.models if catalog.ok else None,
+        discovery_source=catalog.source,
+        discovery_timestamp=catalog.fetched_at,
+        groq_model=settings.groq_model or settings.ai_model,
+        gemini_model=settings.gemini_model,
+    )
+    cfg = RouterConfig(
+        free_only=getattr(settings, "ai_free_only", True),
+        max_attempts=getattr(settings, "ai_max_attempts_per_request", 6),
+        max_retries_per_provider=getattr(settings, "ai_max_retries_per_provider", 2),
+        request_timeout_seconds=getattr(settings, "ai_request_timeout_seconds", 45.0),
+        max_total_request_seconds=getattr(settings, "ai_max_total_request_seconds", 180.0),
+        fail_threshold=settings.circuit_fail_threshold,
+        cooldown_seconds=settings.circuit_cooldown_seconds,
+        validate_json=getattr(settings, "ai_output_validation_enabled", True),
+    )
+    return FreeOnlyRouter(
+        endpoints,
+        config=cfg,
+        quota=QuotaTracker(state_file=default_state_file(),
+                           default_rpm=getattr(settings, "ai_free_quota_rpm", 20),
+                           default_rpd=getattr(settings, "ai_free_quota_rpd", 1000)),
+        breakers=BreakerBoard(cfg.fail_threshold, cfg.cooldown_seconds),
+        caller_factory=build_caller,
+    )
+
+
 _service = _build_service()
+
+
+def ai_health() -> dict:
+    """Free-verification, breaker and quota snapshot. No credentials inside."""
+    return _service.health()
 
 
 def ai_enabled() -> bool:
@@ -91,6 +144,16 @@ def ai_enabled() -> bool:
 def provider_stats() -> dict:
     """Expose per-provider health/metrics for the monitoring endpoint."""
     return _service.stats()
+
+
+def active_endpoint_keys() -> list[str]:
+    """Endpoint keys that pass the free policy and carry a credential.
+
+    Eligibility, not health: the callers may still be rate limited, cooling
+    down, or broken. Stated explicitly because the monitoring endpoint reports
+    it as ``active`` and readers otherwise assume "healthy".
+    """
+    return _service.active_providers()
 
 
 def _extract_json(text: str) -> dict[str, Any] | None:

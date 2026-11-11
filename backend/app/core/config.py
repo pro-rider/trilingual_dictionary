@@ -42,8 +42,11 @@ class Settings(BaseSettings):
     ai_shared_secret: str = ""
     # In-memory quota. 0 = off. Values are also readable from the environment
     # (AI_RATE_LIMIT_PER_MIN / AI_DAILY_CAP) so they can be changed live.
-    ai_rate_limit_per_min: int = 0
-    ai_daily_cap: int = 0
+    # Defaults are non-zero on purpose: a production deployment must not inherit
+    # "no limiter at all" merely because nobody set a value. The limiter only
+    # counts while ai_enabled is True, so offline-only lookups are unaffected.
+    ai_rate_limit_per_min: int = 60
+    ai_daily_cap: int = 2000
 
     # ---- Multi-provider LLM failover (priority: groq → gemini → openrouter) ----
     ai_providers_order: str = "groq,gemini,openrouter"
@@ -79,6 +82,24 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = ""
     ai_base_url: str = "https://api.groq.com/openai/v1"
+
+    # ---- Strict zero-cost failover (20-slot registry) --------------------------
+    # free_only: an endpoint may only run when both prices are verified as 0.
+    # Paid slots stay in the registry, disabled, so the shortfall is visible.
+    ai_free_only: bool = True
+    ai_max_models: int = 20
+    ai_max_attempts_per_request: int = 6      # hard cap on endpoint calls per request
+    ai_max_retries_per_provider: int = 2      # retries inside one endpoint
+    ai_request_timeout_seconds: float = 45.0
+    ai_max_total_request_seconds: float = 180.0
+    ai_enable_local_fallback: bool = False    # Ollama is optional, never required
+    ai_enable_paid_fallback: bool = False     # hard-coded off by policy
+    ai_strict_zero_cost: bool = True
+    ai_model_discovery_enabled: bool = True   # re-verify the OpenRouter catalogue
+    ai_model_discovery_interval_hours: int = 24
+    ai_output_validation_enabled: bool = True
+    ai_free_quota_rpm: int = 20               # conservative, provider-unknown guard
+    ai_free_quota_rpd: int = 1000
 
     # Supabase auth (optional). Set the project JWT secret to verify tokens
     # issued by Supabase Auth in the /me + favorites + feedback endpoints.

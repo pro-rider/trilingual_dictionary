@@ -11,8 +11,11 @@ Three jobs, all deliberately cheap and reversible:
    (the loops still run), which is why this is safe to ship before the Flutter
    client learns to send the header.
 3. ``enforce_limits`` — in-memory per-client and global sliding window plus a
-   daily request ceiling. Limits default to 0 (off) so existing behaviour and
-   tests are unchanged until somebody sets them.
+   daily request ceiling. Defaults are non-zero (60/min, 2000/day) so a
+   production deployment is limited out of the box instead of inheriting "no
+   limiter at all" because nobody set a value. The limiter counts every call to
+   a guarded route, whether or not AI answers it, because the gate belongs at
+   the boundary rather than at the spend site.
 
 Nothing here logs user text: only counts, client keys and status codes.
 """

@@ -42,6 +42,22 @@ def _isolate_runtime_cache(tmp_path, monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _isolate_ai_limiter():
+    """Reset the process-global limiter per test.
+
+    The limiter now has non-zero defaults and counts every guarded request, so
+    without this fixture a test that sets AI_RATE_LIMIT_PER_MIN=1 would also
+    consume the budget of later tests that never asked for a limit. Reset, not
+    disabled: the tests that assert the limiter still see real behaviour.
+    """
+    from app.core.ai_guard import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 def _sha(p: Path):
     if not p.exists():
         return None

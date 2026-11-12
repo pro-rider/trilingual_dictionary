@@ -4,8 +4,17 @@ from __future__ import annotations
 import os
 import sqlite3
 
+import pytest
+
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(BACKEND, "data", "build", "dictionary.sqlite")
+
+# The built dictionary is a 122 MB artifact and is not committed, so a clean
+# checkout (CI included) has no database to read. Skipping keeps the gate
+# honest about what it can and cannot observe without that artifact.
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DB), reason="built dictionary database not present"
+)
 
 
 def _con():

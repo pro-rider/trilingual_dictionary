@@ -42,6 +42,9 @@ def test_validator_rules(headword, zh, en, ne, reason):
     assert gen.validate(headword, zh, en, ne) == reason
 
 
+@pytest.mark.skipif(
+    not os.path.exists(DB), reason="built dictionary database not present"
+)
 def test_generated_rows_go_to_candidates_only(tmp_path):
     copy = tmp_path / "copy.sqlite"
     shutil.copy2(DB, copy)

@@ -53,3 +53,38 @@ after a decision is imported with `tools/import_review.py`.
 `entry_id, headword, pinyin, English gloss, Nepali (machine), Chinese candidate, source, decision, edited_text, reviewer_notes`
 
 The import tool reads these headers by name, so do not rename them.
+
+## Where these files live, and how to rebuild them
+
+Canonical path:
+`C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\review\`
+(21 workbooks, 9,538 data rows, 1,194,560 B at the last build).
+
+They are **build artefacts, not source**. Rebuild all 21 from the working
+database with:
+
+```
+cd backend
+.venv\Scripts\python.exe tools\build_review_packages.py     # writes review/ + this README
+.venv\Scripts\python.exe tools\verify_review_packages.py    # asserts structure and row counts
+```
+
+`verify_review_packages.py` re-reads this table, opens every workbook, checks the
+`Review` sheet, the exact 10-column header and the real row count, and confirms
+that each topic's part numbers are contiguous. It prints `ALL WORKBOOKS VALID`
+only when all of that holds.
+
+## Git policy
+
+`.gitignore` lines 70–71 exclude `/review/*.xlsx` and `/review/*.csv`. This
+README is the only file under `review/` that git tracks:
+
+```
+git ls-files review               -> review/README.md
+git ls-files "*.xlsx" "*.csv"     -> (empty)
+```
+
+Never commit a workbook: byte-identical content still differs in zip timestamps,
+so they would churn on every rebuild and would carry reviewer answers (free text,
+possibly personal) into a public repository. Reviewer copies stay on the reviewer's
+machine, or move through the import tool, not through git.

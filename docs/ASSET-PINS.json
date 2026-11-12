@@ -3,12 +3,12 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "53b03ebafce0eb295ce8e95b056b6873901518dda0c14ebd0b3c920575aa33d5",
-      "bytes": 122621952,
-      "approved_by": "AI Release Authority — APPROVED 2026-11-12T14:55:45Z on commit 393a71f. Rebuilt by backend/tools/build_release_db.py: db-f6008049a2, entries 123672, senses 198306, examples 392. images 77 -> 113 (36 Wikimedia Commons photographs added under the strict licence (CC0/PD/CC BY/CC BY-SA only), quality (>=500 px, no book scans or engravings) and lexical-relevance gates); entries with a picture 204 -> 246, of which 8 came from exact-label concept inheritance and 2 of those were removed by review (时候 -> pocket watch, 鸟 -> an Aristophanes engraving). 35 of the 113 references used a nested thumbs/<xx>/<sha>.webp layout that Flutter never bundled - the previous APK shipped 84 thumbnails while the database pointed at 35 files that were not in it - so every reference is now flat (thumbs/<sha>.webp), the dead duplicates and 9 orphan files are deleted, and tools/verify_image_assets.py fails the build on a missing, nested, orphan or absent thumbnail. One missing thumbnail (image 7) was regenerated. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin 53b03eba.",
+      "sha256": "2d98a0ec1ffd8ab4259955ca8340ae0c5c51022f565878633b3aa3ecdfd957f6",
+      "bytes": 122683392,
+      "approved_by": "AI Release Authority — APPROVED 2026-11-12T15:57:43Z on commit 4153bcd. Rebuilt by backend/tools/build_release_db.py: db-212f19b8e2, entries 123672, senses 198306, examples 392. images 77 -> 113 (36 Wikimedia Commons photographs added under the strict licence (CC0/PD/CC BY/CC BY-SA only), quality (>=500 px, no book scans or engravings) and lexical-relevance gates); entries with a picture 204 -> 246, of which 8 came from exact-label concept inheritance and 2 of those were removed by review (时候 -> pocket watch, 鸟 -> an Aristophanes engraving). 35 of the 113 references used a nested thumbs/<xx>/<sha>.webp layout that Flutter never bundled - the previous APK shipped 84 thumbnails while the database pointed at 35 files that were not in it - so every reference is now flat (thumbs/<sha>.webp), the dead duplicates and 9 orphan files are deleted, and tools/verify_image_assets.py fails the build on a missing, nested, orphan or absent thumbnail. One missing thumbnail (image 7) was regenerated. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin 2d98a0ec.",
       "known_defect": null,
-      "approved_at_utc": "2026-11-12T14:55:45Z",
-      "approved_on_commit": "393a71f"
+      "approved_at_utc": "2026-11-12T15:57:43Z",
+      "approved_on_commit": "4153bcd"
     },
     {
       "path": "backend/data/build/translations.db",

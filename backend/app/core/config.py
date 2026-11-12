@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     # counts while ai_enabled is True, so offline-only lookups are unaffected.
     ai_rate_limit_per_min: int = 60
     ai_daily_cap: int = 2000
+    # Two budgets, deliberately separate. The per-client values (keyed by
+    # X-Client-Id, falling back to the caller's IP) stop one device from
+    # consuming everything; the global values protect the provider quota as a
+    # whole. Environment overrides: AI_RATE_LIMIT_PER_MIN, AI_DAILY_CAP_PER_CLIENT,
+    # AI_RATE_LIMIT_GLOBAL_PER_MIN, AI_DAILY_CAP.
+    ai_daily_cap_per_client: int = 100
+    ai_rate_limit_global_per_min: int = 600
 
     # ---- Multi-provider LLM failover (priority: groq → gemini → openrouter) ----
     ai_providers_order: str = "groq,gemini,openrouter"

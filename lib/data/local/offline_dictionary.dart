@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -62,7 +63,23 @@ class OfflineDictionary {
   /// Nothing the user owns is written into this file: AI glosses and AI example
   /// sentences live in [UserStore] (`user.db`), which this replacement never
   /// touches.
-  static const String assetVersion = 'db-e1118fb343';
+  static const String assetVersion = 'db-429a6b6f98';
+
+  /// Rough on-disk size after unpacking, used only for the storage error text.
+  static const int unpackedMegabytes = 100;
+
+  /// First-launch unpack progress, 0.0 → 1.0. Stage-based rather than
+  /// byte-based: the gzip expand is one isolate call, so it reports 0.05 → 0.6
+  /// and the chunked write reports 0.6 → 1.0. A `ValueListenableBuilder` in the
+  /// launch screen can drive a progress bar straight off this.
+  final ValueNotifier<double> unpackProgress = ValueNotifier<double>(0);
+
+  /// Releases the progress notifier when the dictionary is discarded.
+  void dispose() {
+    unpackProgress.dispose();
+    _db?.close();
+    _db = null;
+  }
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.
@@ -138,18 +155,98 @@ class OfflineDictionary {
   }
 
   /// Decompress the bundled asset into the app directory.
+  ///
+  /// Three things this deliberately does, because a 96 MB unpack is the one
+  /// step that can fail on a real phone:
+  ///
+  /// * the bytes are staged in `dictionary.sqlite.part` and only renamed into
+  ///   place after the write succeeded, so a crash or a full disk never leaves
+  ///   a half file that later looks like a usable database;
+  /// * a failure deletes the staged file and records a message that names the
+  ///   storage problem, so the UI can offer "retry" instead of "reinstall";
+  /// * [unpackProgress] is updated in coarse stages (load → expand → write), so
+  ///   the first-launch screen has something honest to show.
   Future<void> _install(File target) async {
-    final data = await rootBundle.load(assetPath);
-    final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-
-    // Decompression of 96 MB is CPU-bound: keep it off the UI isolate.
-    final unpacked = await Isolate.run(() => _gunzip(bytes));
-
     final tmp = File('${target.path}.part');
-    await tmp.writeAsBytes(unpacked, flush: true);
-    await tmp.rename(target.path);
-    await _stamp(target).writeAsString(assetVersion, flush: true);
+    try {
+      unpackProgress.value = 0.05;
+      final data = await rootBundle.load(assetPath);
+      final bytes =
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+
+      // Decompression of 96 MB is CPU-bound: keep it off the UI isolate.
+      final unpacked = await Isolate.run(() => _gunzip(bytes));
+      unpackProgress.value = 0.6;
+
+      // Written in 4 MB chunks: on a nearly-full phone the write fails early
+      // instead of after staging the whole file.
+      final sink = tmp.openWrite();
+      const chunk = 4 << 20;
+      for (var offset = 0; offset < unpacked.length; offset += chunk) {
+        final end = (offset + chunk < unpacked.length)
+            ? offset + chunk
+            : unpacked.length;
+        sink.add(unpacked.sublist(offset, end));
+        unpackProgress.value = 0.6 + 0.4 * (end / unpacked.length);
+      }
+      await sink.flush();
+      await sink.close();
+
+      await tmp.rename(target.path);
+      await _stamp(target).writeAsString(assetVersion, flush: true);
+      unpackProgress.value = 1.0;
+    } catch (e) {
+      _lastError = storageFailure(e);
+      await _discardPartial(target);
+      rethrow;
+    }
   }
+
+  /// Human-readable diagnosis for a failed unpack. `FileSystemException` with
+  /// ENOSPC/EDQUOT is the common case on a full phone; everything else is
+  /// reported verbatim so it can be pasted into a bug report.
+  static String storageFailure(Object error) {
+    final text = error.toString();
+    final lower = text.toLowerCase();
+    if (lower.contains('enospc') || lower.contains('no space') ||
+        lower.contains('edquot') || lower.contains('disk full')) {
+      return 'Not enough free space to unpack the dictionary '
+          '(about $unpackedMegabytes MB is needed). Free some space and tap '
+          'retry.';
+    }
+    if (lower.contains('eacces') || lower.contains('permission')) {
+      return 'The dictionary could not be written to app storage '
+          '(permission denied). Close other apps and tap retry.';
+    }
+    return 'The dictionary could not be unpacked: $text';
+  }
+
+  /// Remove the staged `.part` file and its stamp, so nothing half-written can
+  /// be mistaken for an installed database.
+  Future<void> _discardPartial(File target) async {
+    for (final path in ['${target.path}.part', '${target.path}.stamp']) {
+      try {
+        final file = File(path);
+        if (file.existsSync()) file.deleteSync();
+      } catch (_) {}
+    }
+  }
+
+  /// Retry the first-launch unpack after a failure, discarding partial state.
+  /// Returns true when the database opened, so a UI can branch on the result.
+  Future<bool> retryInstall() async {
+    _opening = null;
+    _lastError = null;
+    unpackProgress.value = 0;
+    await _discardPartial(await _dbFile());
+    final db = await _open();
+    return db != null;
+  }
+
+  /// Exposed for the upgrade test only; production code goes through
+  /// [retryInstall].
+  @visibleForTesting
+  Future<void> discardPartialForTest(File target) => _discardPartial(target);
 
   /// Sidecar file recording which asset build this database came from.
   File _stamp(File dbFile) => File('${dbFile.path}.stamp');

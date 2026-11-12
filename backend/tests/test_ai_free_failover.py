@@ -232,15 +232,18 @@ def test_secret_is_redacted_in_stats(monkeypatch):
 
 
 # ------------------------------------------------------------------- registry
-def test_registry_has_twenty_slots_and_honest_shortfall():
+def test_registry_slots_are_unique_and_honest():
+    """20 free-provider slots plus the opt-in paid lane (slot 21)."""
     eps = build_registry(free_models=None)
-    _check(len(eps) == 20, f"expected 20 slots, got {len(eps)}")
-    _check(len({e.slot for e in eps}) == 20, "slots must be unique")
-    _check(len({e.key for e in eps}) == 20, "endpoint keys must be unique")
+    _check(len(eps) == 21, f"expected 21 slots, got {len(eps)}")
+    _check(len({e.slot for e in eps}) == 21, "slots must be unique")
+    _check(len({e.key for e in eps}) == 21, "endpoint keys must be unique")
     summary = registry_summary(eps)
-    _check(summary["slots"] == 20, "summary must report 20 slots")
-    _check(summary["verified_free"] < 20,
+    _check(summary["slots"] == 21, "summary must report 21 slots")
+    _check(summary["verified_free"] < 21,
            "unverified providers must not be counted as verified free")
+    paid = [e for e in eps if e.slot == 21][0]
+    _check(paid.disabled_reason, "the paid lane must be off unless asked for")
 
 
 def test_live_catalogue_demotes_missing_models():

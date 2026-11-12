@@ -5,11 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
+import 'core/diagnostics.dart';
 import 'core/supabase_config.dart';
 import 'data/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Errors are captured locally (no user text, no network) until crash
+  // reporting is a deliberate product decision.
+  await Diagnostics().init();
 
   // Optional cloud layer: skip init entirely until Supabase keys are set, so
   // the offline dictionary always works.

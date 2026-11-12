@@ -13,6 +13,7 @@ import '../features/settings/tts_diagnostic_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/detail/detail_screen.dart';
+import '../features/about/credits_screen.dart';
 
 /// App routes. '/' boots splash → '/home'.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -77,6 +78,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/favorites',
         builder: (_, _) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: '/credits',
+        builder: (_, _) => const CreditsScreen(),
+      ),
+      GoRoute(
+        path: '/data-quality',
+        builder: (_, _) => const DataQualityScreen(),
       ),
     ],
   );

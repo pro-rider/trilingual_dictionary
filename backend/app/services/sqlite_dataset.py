@@ -306,12 +306,34 @@ def find_entry(query: str, lang: str) -> dict[str, Any] | None:
                 return _row_to_entry(con, row)
 
         # Pinyin without tones: "ni hao", "nihao", "nu:3"->"nv".
+        #
+        # `pinyin_plain` keeps the syllables apart ("an pai"), so typing
+        # "anpai" used to return nothing even though 安排 exists. `pinyin_search`
+        # holds both spellings ("anpai an pai"), so a word-boundary match on it
+        # covers the joined form without turning the query into a substring
+        # match. Frequency decides among the hits: "shui" used to answer 帨
+        # (handkerchief, freq unranked) before 水 #653.
         plain = _variants(q_lower)
         if plain:
             for candidate in plain[:2]:
                 row = con.execute(
                     "SELECT * FROM entries WHERE pinyin_plain = ? "
-                    "ORDER BY is_proper, LENGTH(simplified) LIMIT 1",
+                    "ORDER BY is_proper DESC, COALESCE(freq_rank, 100000000), "
+                    "LENGTH(simplified) LIMIT 1",
+                    (candidate,),
+                ).fetchone()
+                if row is not None:
+                    return _row_to_entry(con, row)
+                row = con.execute(
+                    # `pinyin_search` lists every spelling the entry accepts,
+                    # space-separated and in either order ("zhong guo
+                    # zhongguo"), so the query is matched as a whole token
+                    # rather than with a prefix rule that only sees token one.
+                    "SELECT * FROM entries "
+                    "WHERE ' ' || pinyin_search || ' ' "
+                    "LIKE '% ' || ? || ' %' "
+                    "ORDER BY is_proper DESC, COALESCE(freq_rank, 100000000), "
+                    "LENGTH(simplified) LIMIT 1",
                     (candidate,),
                 ).fetchone()
                 if row is not None:

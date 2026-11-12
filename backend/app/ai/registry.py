@@ -252,6 +252,33 @@ def build_registry(*, free_models: dict[str, dict] | None = None,
                     reason="experiment tier can convert to paid; no zero-price proof"),
     ]
 
+    # Slot 21: the paid lane. Never enabled by accident — it needs an explicit
+    # AI_ALLOW_PAID=1 plus its own base URL, model and key variable, so a paid
+    # provider can be added later without editing code or committing a key.
+    paid_base = (os.environ.get("PAID_PROVIDER_BASE_URL") or "").strip()
+    paid_model = (os.environ.get("PAID_PROVIDER_MODEL") or "").strip()
+    paid_key_env = (os.environ.get("PAID_PROVIDER_API_KEY_ENV")
+                    or "PAID_PROVIDER_API_KEY").strip()
+    paid_allowed = (os.environ.get("AI_ALLOW_PAID") or "").strip().lower() in {
+        "1", "true", "yes", "on"}
+    paid_ready = bool(paid_base and paid_model and paid_allowed)
+    endpoints.append(ModelEndpoint(
+        slot=21, provider_id="paid", model_id=paid_model or "(not configured)",
+        endpoint_type="openai_compatible",
+        base_url=paid_base or "about:blank",
+        api_key_env=paid_key_env, priority=100, free_verified=False,
+        verification_source="operator-provided paid lane (AI_ALLOW_PAID=1)",
+        verification_timestamp=VERIFIED_AT,
+        input_price=None, output_price=None,
+        account_quota_pool="pool_paid", rate_limit_scope="pool",
+        context_limit=None, supports_json=True, supports_tools=False,
+        supports_streaming=True, supports_vision=False,
+        timeout_seconds=45, cooldown_seconds=120,
+        disabled_reason="" if paid_ready else (
+            "paid lane not configured: set AI_ALLOW_PAID=1 plus its base URL, "
+            "model and credential (see docs/AI_PROVIDERS.md)"),
+    ))
+
     if free_models is not None:
         for ep in endpoints:
             if ep.provider_id != "openrouter" or ep.model_id == "meta-llama/llama-3.1-70b-instruct":

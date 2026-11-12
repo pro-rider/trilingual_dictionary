@@ -33,6 +33,7 @@ from app.ai.free_policy import allowed_candidates, decide
 from app.ai.quota import QuotaTracker
 from app.ai.redaction import redact, register_secret
 from app.ai.registry import ModelEndpoint, registry_summary
+from app.core import obs
 
 logger = logging.getLogger("app.ai.router")
 
@@ -211,6 +212,8 @@ class FreeOnlyRouter:
                 attempts.append(Attempt(ep.key, "ok", "", latency, attempt_no))
                 logger.info("ai_attempt endpoint=%s kind=ok attempt=%d latency_ms=%.0f",
                             ep.key, attempt_no, latency)
+                obs.note_ai_attempt(True, endpoint=ep.key, attempt=attempt_no,
+                                    latency_ms=round(latency))
                 stats = self.stats(attempts, winner=ep.key, exhausted=False)
                 self._last_stats = stats
                 return text, ep.key, stats
@@ -218,6 +221,8 @@ class FreeOnlyRouter:
         stats = self.stats(attempts, winner="none", exhausted=True, last_kind=last_kind)
         self._last_stats = stats
         logger.error("ai_chain_exhausted attempts=%d last_kind=%s", len(attempts), last_kind)
+        obs.note_ai_attempt(False, kind=last_kind, attempt=len(attempts))
+        obs.maybe_alert()
         return None, "none", stats
 
     # ----------------------------------------------------------- internals

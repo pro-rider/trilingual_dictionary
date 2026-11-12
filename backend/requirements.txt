@@ -12,5 +12,10 @@ psycopg[binary]>=3.2
 httpx>=0.27
 pytest>=8.3
 PyJWT>=2.9
+# Read/write the review workbooks in tests/test_review_roundtrip.py. It lived
+# only in the local venv, so CI failed at collection with
+# "ModuleNotFoundError: No module named 'openpyxl'" while the same suite was
+# green on the developer machine.
+openpyxl>=3.1
 # Chinese word segmentation (dictionary-driven; falls back to greedy matching)
 jieba>=0.42.1

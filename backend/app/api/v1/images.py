@@ -92,11 +92,69 @@ def _category_icon(entry_id: str) -> str:
     return row[0] or "general"
 
 
+def _concept_query(entry_id: str) -> list[dict]:
+    """Second chance: the same concept family, when the entry has no own image.
+
+    A concept image is usable when it satisfies exactly the filter the client applies
+    (approved, asset approved, thumbnail present). Ordered by the concept-image
+    relevance and the entry's concept match confidence, so the closest picture wins.
+    """
+    if not _db().exists():
+        return []
+    con = sqlite3.connect(f"file:{_db()}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute(
+            "SELECT ec.match_confidence, ci.relevance, ci.is_primary, "
+            "       i.image_id, i.thumb_path, i.detail_path, i.width, i.height, "
+            "       i.attribution_text, i.license, i.license_url, i.source_url "
+            "FROM entry_concepts ec "
+            "JOIN concept_images ci ON ci.concept_id = ec.concept_id "
+            "JOIN images i ON i.image_id = ci.image_id "
+            "WHERE ec.entry_id = ? AND i.status = 'approved' "
+            "  AND COALESCE(i.asset_status, 'approved') = 'approved' "
+            "  AND i.thumb_asset IS NOT NULL AND i.thumb_asset <> '' "
+            "ORDER BY ci.is_primary DESC, ci.relevance DESC, "
+            "         ec.match_confidence DESC LIMIT 5",
+            (entry_id,),
+        ).fetchall()
+    except sqlite3.Error:
+        rows = []
+    finally:
+        con.close()
+    return [dict(row, confidence=row["match_confidence"],
+                 match_method="concept-family", rank=2) for row in rows]
+
+
+def _resolve_word(word: str) -> str:
+    """Turn a headword into an entry id, so seed/AI entries can still ask."""
+    word = (word or "").strip()
+    if not word or not _db().exists():
+        return ""
+    con = sqlite3.connect(f"file:{_db()}?mode=ro", uri=True)
+    try:
+        row = con.execute(
+            "SELECT entry_id FROM entries WHERE simplified = ? OR traditional = ? "
+            "ORDER BY freq_rank IS NULL, freq_rank, entry_id LIMIT 1",
+            (word, word),
+        ).fetchone()
+    except sqlite3.Error:
+        row = None
+    finally:
+        con.close()
+    return str(row[0]) if row else ""
+
+
 @router.get("/images", response_model=ImagesResponse)
-def images(request: Request, entry_id: str = Query(...), limit: int = Query(3, ge=1, le=5)):
+def images(request: Request, entry_id: str = Query(""), word: str = Query(""),
+           limit: int = Query(3, ge=1, le=5)):
     normalised = _normalise_entry_id(entry_id)
+    if not normalised and word:
+        normalised = _resolve_word(word)
     grouped = _query([normalised]) if normalised else {}
     rows = grouped.get(normalised, [])[:limit]
+    if not rows and normalised:
+        rows = _concept_query(normalised)[:limit]
 
     items = [
         ImageItem(
@@ -135,6 +193,8 @@ def images_batch(
     out = []
     for raw_id, norm in normalised.items():
         rows = grouped.get(norm, [])[:limit]
+        if not rows and norm:
+            rows = _concept_query(norm)[:limit]
         out.append(
             ImagesResponse(
                 entry_id=raw_id,

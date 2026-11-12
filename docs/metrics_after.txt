@@ -1,0 +1,14 @@
+database   : C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\backend\data\build\dictionary.sqlite
+db size    : 121,683,968 bytes (116.0 MiB)
+packaged   : 46,219,545 bytes (44.1 MiB)
+entries    : 123,672
+senses     : 198,306
+gloss_en gap: 0
+gloss_zh gap: 184,439 (93.01% empty, coverage 6.99%)
+gloss_ne    : 3,245 filled (1.64%); status {'ai_translated': 3245, 'reviewed': 0}
+examples   : 392 {'imported': 376, 'quarantined': 1, 'unverified': 15}
+classifiers: 1,459 rows / 106 distinct
+hsk tagged : 2,477
+images     : 77 total, 77 approved, {'approved': 76, 'pending_review': 1}
+meta       : dataset_version=2, built_at=2026-11-08T00:06:54, builder=tools/build_dictionary.py, source_primary=CC-CEDICT, has_trigram_fts=1, schema_version=v005
+candidates : {"words3000_candidates": 1348, "gloss_zh_candidates": 17786, "gloss_zh_wikt_candidates": 31760, "launch_set": 123672, "gloss_provenance": 13867, "review_audit": 0}

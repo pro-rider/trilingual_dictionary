@@ -50,6 +50,7 @@ import hashlib
 import html
 import io
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -62,6 +63,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 UA = (
     "TrilingualDictionary/0.3 (dictionary image pipeline; "
@@ -216,7 +219,10 @@ def migrate(con: sqlite3.Connection) -> list[str]:
     con.execute(
         "CREATE INDEX IF NOT EXISTS idx_concept_images_c ON concept_images(concept_id)"
     )
-    con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version','5')")
+    # Never restamp the schema here. Writing a bare "5" broke the release builder's
+    # `v005` comparison the moment this pipeline touched a finished database, so
+    # the stamp is left exactly as the schema builder set it.
+    applied.append("meta left untouched")
     con.commit()
     return applied
 
@@ -329,18 +335,32 @@ def resolve_concept_en(term: str) -> dict | None:
     return None
 
 
-def concept_image_files(qid: str) -> list[str]:
-    """P18 (image) statements for the concept, in statement order."""
+def concept_image_files(qid: str, gloss: str = "") -> list[str]:
+    """P18 (image) statements for the concept, in statement order.
+
+    When `gloss` is given the item's English labels and aliases must contain it:
+    a Wikidata item is only a trustworthy anchor if the item *is* the word. Without
+    this check a search hit for a different sense (一次 → "first") ships a
+    photograph of something else entirely.
+    """
     data = _get_json(
         WIKIDATA_API,
         {
             "action": "wbgetentities",
             "ids": qid,
-            "props": "claims",
+            "props": "claims|labels|aliases",
+            "languages": "en|zh",
             "format": "json",
         },
     )
     entity = (data.get("entities") or {}).get(qid) or {}
+    if gloss:
+        wanted = _norm_word(gloss)
+        names = {(entity.get("labels") or {}).get("en", {}).get("value", "")}
+        for item in ((entity.get("aliases") or {}).get("en") or []):
+            names.add(item.get("value", ""))
+        if not any(_norm_word(n) == wanted for n in names if n):
+            return []
     files: list[str] = []
     for claim in (entity.get("claims") or {}).get("P18", []):
         value = claim.get("mainsnak", {}).get("datavalue", {}).get("value")
@@ -349,6 +369,66 @@ def concept_image_files(qid: str) -> list[str]:
         if name:
             files.append(name)
     return files
+
+
+def _norm_word(text: str) -> str:
+    text = (text or "").strip().lower()
+    text = re.sub(r"\s*\(.*?\)\s*", " ", text)
+    text = re.sub(r"^(the|a|an)\s+", "", text)
+    text = re.sub(r"[^a-z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > 3 and text.endswith("s"):
+        text = text[:-1]
+    return text
+
+
+def commons_search(term: str, limit: int = 8) -> list[str]:
+    """Commons file-title search for the English gloss.
+
+    Last resort when the concept has no P18 statement. The relevance gate still
+    runs on every hit, so a search that returns something unrelated ("bus" ->
+    "Bust of …") is rejected rather than shipped.
+    """
+    if not term or len(term) < 3:
+        return []
+    data = _get_json(
+        COMMONS_API,
+        {
+            "action": "query",
+            "list": "search",
+            "srsearch": f"{term} filetype:bitmap",
+            "srnamespace": "6",
+            "srlimit": str(limit),
+            "format": "json",
+        },
+    )
+    hits = ((data.get("query") or {}).get("search") or [])
+    return [h["title"].split("File:", 1)[-1] for h in hits if h.get("title")]
+
+
+def commons_category_files(term: str, limit: int = 8) -> list[str]:
+    """Files filed under Category:<gloss> on Commons.
+
+    A Commons category is curated by humans around one subject, so a photograph
+    taken from Category:Bus shows a bus even when its file name says nothing.
+    That is the identity evidence a plain title search lacks, which is why this
+    tier can be on by default while the title search stays opt-in.
+    """
+    if not term or len(term) < 3:
+        return []
+    data = _get_json(
+        COMMONS_API,
+        {
+            "action": "query",
+            "list": "categorymembers",
+            "cmtitle": f"Category:{term}",
+            "cmtype": "file",
+            "cmlimit": str(limit),
+            "format": "json",
+        },
+    )
+    members = ((data.get("query") or {}).get("categorymembers") or [])
+    return [m["title"].split("File:", 1)[-1] for m in members if m.get("title")]
 
 
 def sitelink_lead_image(qid: str, lang: str) -> tuple[str, str] | None:
@@ -429,6 +509,7 @@ def file_asset(concept_file: str, width: int = 900) -> Asset | None:
             license=_clean((meta.get("LicenseShortName") or {}).get("value", "")),
             license_url=_clean((meta.get("LicenseUrl") or {}).get("value", "")),
             source_url=info.get("descriptionurl", ""),
+            extra={"categories": _clean((meta.get("Categories") or {}).get("value", ""))},
         )
     return None
 
@@ -445,6 +526,97 @@ def licence_verdict(asset: Asset) -> tuple[bool, str]:
     return True, ""
 
 
+STOP_TOKENS = {
+    "the", "and", "for", "with", "from", "that", "this", "into", "than", "then",
+    "some", "such", "other", "also", "used", "using", "one", "ones", "very",
+    "any", "all", "more", "most", "not", "etc", "e.g", "i.e", "someone",
+}
+
+# Words that appear in thousands of file names and categories; matching them
+# proves nothing. Keeping them would let "thing", "man", "building" approve
+# almost any photograph.
+GENERIC_TOKENS = {
+    "photo", "image", "picture", "photograph", "file", "commons", "wikimedia",
+    "wikipedia", "jpg", "jpeg", "png", "svg", "webp", "view", "closeup",
+    "close-up", "copy", "version", "edit", "edited", "collection", "museum",
+    "public", "domain", "cc", "by", "sa", "license", "author", "unknown",
+    "object", "objects", "thing", "things", "part", "parts", "type", "types",
+    "group", "groups", "people", "person", "persons", "man", "woman", "men",
+    "women", "child", "children", "building", "buildings", "place", "places",
+    "area", "areas", "system", "systems", "action", "actions", "process",
+}
+
+
+def _tokens(text: str) -> set[str]:
+    raw = re.split(r"[^a-z0-9]+", (text or "").lower())
+    return {t for t in raw if len(t) >= 3 and t not in STOP_TOKENS and t not in GENERIC_TOKENS}
+
+
+ABSTRACT_TOKENS = {
+    "time", "life", "work", "state", "way", "case", "fact", "kind", "sort",
+    "level", "period", "moment", "number", "amount", "value", "effect", "change",
+    "form", "means", "idea", "name", "word", "language", "history", "science",
+    "nature", "health", "art", "music", "sport", "business", "society", "culture",
+    "world", "country", "city", "year", "day", "month", "age", "reason", "result",
+}
+
+
+def relevance_verdict(asset: Asset, gloss: str) -> tuple[bool, str]:
+    """Lexical overlap between the word's own English gloss and the file.
+
+    Wikidata's exact-label check guarantees the *concept* is right, not the
+    photograph. 时候 resolved to a concept whose P18 is "The AI Arms Race Is
+    Changing Everything", and 企业 to a shopping centre — both perfectly licensed
+    and perfectly wrong. Since the dictionary already holds an English gloss for
+    the word, the cheapest honest gate is lexical: a content word from the gloss
+    must appear in the file name, or (for words of five letters or more) in the
+    file's Commons categories. Abstract gloss words such as "time" and "state"
+    are ignored, because they match half of Commons by accident.
+    """
+    want = _tokens(gloss)
+    if not want:
+        return False, "no usable English gloss to verify against"
+    strong = want - ABSTRACT_TOKENS
+    name = _tokens(asset.file_name)
+    cats = _tokens(asset.extra.get("categories", ""))
+    hit = {t for t in strong
+           if any(t == h or (len(t) >= 4 and (t in h or h in t)) for h in name)}
+    if not hit:
+        hit = {t for t in strong if len(t) >= 5 and any(t == h or t in h for h in cats)}
+    if not hit:
+        return False, f"no lexical overlap with '{gloss[:40]}'"
+    return True, ""
+
+
+ABSTRACT_GLOSS = re.compile(
+    r"^(the )?(act|action|state|quality|process|fact|condition|situation|"
+    r"relation|feeling|idea|amount|degree|period|time|way|method|system|"
+    r"ability|right|power|influence|change|event|activity|behaviour|behavior|"
+    r"concept|notion|term|word|expression|title|name)\b"
+    r"|\b(sb|sth|somebody|something)\b"
+    r"|^\w+ of (the |a )?\w+", re.I)
+
+# Glosses that never correspond to a photograph: function words, pronouns,
+# modals, directions, and verbs. Filtering them here is a cheap pre-check; the
+# lexical gate would reject their matches anyway, but only after a download.
+FUNCTION_GLOSS = re.compile(
+    r"^(yes|no|maybe|perhaps|how|what|who|whom|whose|when|where|why|whether|"
+    r"can|may|might|must|should|shall|will|would|could|not|also|again|still|"
+    r"very|more|most|all|any|some|each|every|both|either|neither|other|another|"
+    r"such|so|as|if|then|than|because|although|though|while|during|before|"
+    r"after|under|over|between|above|below|inside|outside|near|far|here|there|"
+    r"now|today|tomorrow|yesterday|to |a |an |the )", re.I)
+
+
+# A dictionary entry wants a photograph of the thing. Book plates, playbills,
+# engravings and museum scans share the word but show a page, not the object.
+REPRODUCTION = re.compile(
+    r"\b(illustration|engraving|lithograph|etching|woodcut|manuscript|"
+    r"playbill|poster|book|books|titlepage|title page|frontispiece|"
+    r"stamp|banknote|comic|cartoon|diagram|schematic|painting|drawing|"
+    r"sketch|plaque|sign|logo|coat of arms|map|chart|graph|table)\b", re.I)
+
+
 def quality_verdict(asset: Asset) -> tuple[bool, str]:
     if asset.mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
         return False, f"mime {asset.mime or 'unknown'}"
@@ -455,6 +627,8 @@ def quality_verdict(asset: Asset) -> tuple[bool, str]:
     ratio = asset.width / asset.height if asset.height else 0
     if ratio < 0.5 or ratio > 2.2:
         return False, f"aspect ratio {ratio:.2f}"
+    if REPRODUCTION.search(asset.file_name):
+        return False, f"reproduction, not a photograph ({asset.file_name[:40]})"
     return True, ""
 
 
@@ -525,7 +699,8 @@ def dhash(img: Image.Image) -> str:
 
 # -------------------------------------------------------------------- main ---
 def candidate_rows(con: sqlite3.Connection, limit: int, skip: set[int],
-                   categories: list[str], words: list[str] | None = None) -> list[sqlite3.Row]:
+                   categories: list[str], words: list[str] | None = None,
+                   concrete_only: bool = False) -> list[sqlite3.Row]:
     """Picturable words first.
 
     Ordering by raw frequency alone selects 的 / 是 / 和 — grammatical function
@@ -574,6 +749,19 @@ def candidate_rows(con: sqlite3.Connection, limit: int, skip: set[int],
             continue
         if len(row["simplified"]) == 1 and row["simplified"] in SINGLE_CHAR_SKIP:
             continue
+        if concrete_only and ABSTRACT_GLOSS.search(row["gloss_en"] or ""):
+            continue
+        if concrete_only and FUNCTION_GLOSS.match(row["gloss_en"] or ""):
+            continue
+        if concrete_only and len(row["simplified"]) < 2:
+            continue
+        if concrete_only:
+            gloss = (row["gloss_en"] or "").strip()
+            # A picturable word is nearly always glossed as a short noun phrase:
+            # one to three words, no verb marker, no clause punctuation.
+            if gloss.count(" ") > 2 or re.search(r"[;,()/]|^to ", gloss) \
+                    or gloss.endswith("ing") or gloss.startswith(("a ", "an ")):
+                continue
         out.append(row)
         if len(out) >= limit:
             break
@@ -583,7 +771,9 @@ def candidate_rows(con: sqlite3.Connection, limit: int, skip: set[int],
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default="data/build/dictionary.sqlite")
-    ap.add_argument("--out", default="data/images")
+    ap.add_argument("--out", default=str(REPO_ROOT / "assets" / "images"),
+                    help="where thumbs/ and detail/ live; defaults to the bundled "
+                         "assets/images so thumb_asset never points at a stray folder")
     ap.add_argument("--limit", type=int, default=100)
     ap.add_argument("--sleep", type=float, default=0.6)
     ap.add_argument("--dry-run", action="store_true", help="resolve only, write nothing")
@@ -593,6 +783,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="comma-separated entry categories to consider; empty = all")
     ap.add_argument("--words", default="",
                     help="path to a newline/comma separated list of headwords to try first")
+    ap.add_argument("--concrete-only", action="store_true",
+                    help="skip glosses that describe abstractions (state of, act of, "
+                         "quality, relation …) — they never have a photograph")
+    ap.add_argument("--sitelink", action="store_true",
+                    help="also try the zh/en Wikipedia lead image (2 extra "
+                         "round-trips per word; rarely the only source)")
     args = ap.parse_args(argv)
 
     db = Path(args.db)
@@ -603,8 +799,9 @@ def main(argv: list[str] | None = None) -> int:
     (out_dir / "thumbs").mkdir(parents=True, exist_ok=True)
     (out_dir / "detail").mkdir(parents=True, exist_ok=True)
 
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=15)
     con.row_factory = sqlite3.Row
+    con.execute("PRAGMA busy_timeout=15000")
     changes = migrate(con)
     print("migration:", changes)
 
@@ -614,7 +811,7 @@ def main(argv: list[str] | None = None) -> int:
     stats = {"tried": 0, "approved": 0, "no_concept": 0, "no_image": 0,
              "licence_rejected": 0, "quality_rejected": 0, "download_failed": 0,
              "thumb_failed": 0, "deduped": 0}
-    manifest = (out_dir / "manifest_v2.jsonl").open("a", encoding="utf-8")
+    manifest = (out_dir / f"manifest_v2_{os.getpid()}.jsonl").open("a", encoding="utf-8")
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     seed_words: list[str] | None = None
@@ -625,7 +822,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for row in candidate_rows(con, args.limit, done,
                               [c.strip() for c in args.categories.split(",") if c.strip()],
-                              seed_words):
+                              seed_words, args.concrete_only):
         stats["tried"] += 1
         term = re.split(r"[;(]", row["gloss_en"] or "")[0].strip()
         term = re.sub(r"^[a-z]*\.\s*", "", term)
@@ -648,11 +845,12 @@ def main(argv: list[str] | None = None) -> int:
         # the difference between 20 and 6 words a minute.
         files: list[str] = []
         try:
-            files = concept_image_files(concept["qid"])
+            files = concept_image_files(concept["qid"], term)
         except Exception as exc:  # noqa: BLE001
             print(f"  P18 lookup failed: {exc}")
 
-        def try_files(names: list[str]) -> tuple[Asset | None, str]:
+        def try_files(names: list[str], gloss: str,
+                      from_category: bool = False) -> tuple[Asset | None, str]:
             why = ""
             for name in names:
                 if name.lower().endswith((".svg", ".tif", ".tiff", ".pdf", ".ogv", ".webm")):
@@ -674,11 +872,49 @@ def main(argv: list[str] | None = None) -> int:
                 if not ok_q:
                     why = why_q
                     continue
+                ok_r, why_r = relevance_verdict(cand, gloss)
+                if not ok_r and from_category:
+                    # Category membership alone is NOT enough evidence: Category:
+                    # Second is full of unrelated photographs, and it put a
+                    # destination-sign photo on 第二 and a rally car on 左右.
+                    # Membership only widens the candidate pool; the gloss still
+                    # has to appear in the file name or its categories.
+                    ok_r, why_r = False, f"{why_r} (category membership alone rejected)"
+                if not ok_r:
+                    why = why_r
+                    continue
                 return cand, ""
             return None, why
 
-        asset, reason = try_files(files[:2])
+        asset, reason = try_files(files[:2], term)
+
         if asset is None:
+            # Curated category first: the subject of the category is the subject
+            # of the word, so a photo filed under Category:Bus is a photo of a bus.
+            try:
+                members = commons_category_files(term)
+            except Exception as exc:  # noqa: BLE001
+                members = []
+                print(f"  category lookup failed: {exc}")
+            if members:
+                asset, reason2 = try_files(members[:4], term, from_category=True)
+                reason = reason2 or reason
+
+        if asset is None and args.allow_commons_search:
+            # Off by default: a Commons search for the gloss returns files that
+            # merely share the word ("first" → "Shooter person views"), which no
+            # filename-level gate can tell apart from a real match. Only the
+            # curated P18 statement is trustworthy enough to ship.
+            try:
+                hits = commons_search(term)
+            except Exception as exc:  # noqa: BLE001
+                hits = []
+                print(f"  commons search failed: {exc}")
+            if hits:
+                asset, reason2 = try_files(hits[:4], term)
+                reason = reason2 or reason
+
+        if asset is None and args.sitelink:
             extra: list[str] = []
             for lang in ("zh", "en"):
                 try:
@@ -689,12 +925,13 @@ def main(argv: list[str] | None = None) -> int:
                 if lead and lead[0] not in files:
                     extra.append(lead[0])
             if extra:
-                asset, reason2 = try_files(extra[:2])
+                asset, reason2 = try_files(extra[:2], term)
                 reason = reason2 or reason
 
-        if not files:
+        if asset is None and not files:
             stats["no_image"] += 1
-            print(f"[{stats['tried']}] {simplified}: concept {concept['qid']} has no image")
+            print(f"[{stats['tried']}] {simplified}: concept {concept['qid']} has no "
+                  f"image, search for '{term}' gave nothing usable ({reason})")
             time.sleep(args.sleep)
             continue
 
@@ -732,7 +969,11 @@ def main(argv: list[str] | None = None) -> int:
 
             sub = sha[:2]
             detail_path = out_dir / "detail" / sub / f"{sha}.{fmt}"
-            thumb_path = out_dir / "thumbs" / sub / f"{sha}.webp"
+            # Flat, not <sha2>/<sha>.webp: Flutter bundles the files of a declared
+            # asset directory, and a previous build shipped 84 thumbnails while
+            # 35 rows pointed at nested paths that never entered the APK. One
+            # level keeps `pubspec.yaml` (`assets/images/thumbs/`) sufficient.
+            thumb_path = out_dir / "thumbs" / f"{sha}.webp"
             detail_path.parent.mkdir(parents=True, exist_ok=True)
             thumb_path.parent.mkdir(parents=True, exist_ok=True)
             detail_path.write_bytes(blob)
@@ -761,7 +1002,7 @@ def main(argv: list[str] | None = None) -> int:
                     sha, sha, ph, asset.file_name,
                     str(thumb_path).replace("\\", "/"),
                     str(detail_path).replace("\\", "/"),
-                    f"assets/images/thumbs/{sub}/{sha}.webp",
+                    f"assets/images/thumbs/{sha}.webp",
                     asset.detail_url, asset.width, asset.height,
                     "wikimedia_commons", asset.source_url, asset.author,
                     asset.license, asset.license_url, attribution,
@@ -787,6 +1028,14 @@ def main(argv: list[str] | None = None) -> int:
                 "INSERT OR IGNORE INTO concept_images(concept_id, image_id, "
                 "relevance, is_primary) VALUES (?,?,?,1)",
                 (concept["concept_id"], image_id, 0.9),
+            )
+            # Record the word→concept link as well, so a later synonym or the
+            # traditional variant can inherit this picture through the family
+            # instead of needing its own Wikimedia lookup.
+            con.execute(
+                "INSERT OR REPLACE INTO entry_concepts(entry_id, concept_id, "
+                "confidence, method) VALUES (?,?,?,?)",
+                (row["entry_id"], concept["concept_id"], 0.9, "wikidata-exact-label"),
             )
             con.execute(
                 "INSERT OR REPLACE INTO entry_images(entry_id, sense_id, image_id, "

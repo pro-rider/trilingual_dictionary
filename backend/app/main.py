@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
-from app.core import ai_guard
+from app.core import ai_guard, obs
 from app.core.config import settings
 from app.core.exceptions import ApiError
 
@@ -64,6 +65,25 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(api_router, prefix="/api/v1")
+
+    @app.middleware("http")
+    async def log_request(request: Request, call_next):
+        """One structured line per request: route, method, status, duration.
+
+        No query string, no body, no client IP — the project rule is that user
+        text is never logged. The route template keeps cardinality low enough
+        for useful aggregation.
+        """
+        start = time.perf_counter()
+        response = await call_next(request)
+        obs.log_event(
+            "http_request",
+            route=request.scope.get("route").path if request.scope.get("route") else "unmatched",
+            method=request.method,
+            status=response.status_code,
+            duration_ms=round((time.perf_counter() - start) * 1000),
+        )
+        return response
 
     @app.exception_handler(ApiError)
     async def api_error_handler(request: Request, exc: ApiError):

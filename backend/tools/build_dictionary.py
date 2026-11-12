@@ -278,12 +278,15 @@ def read_cedict(path: Path) -> tuple[list[Entry], dict[str, int]]:
                 if not gloss:
                     continue
                 if gloss.startswith("CL:"):
-                    # CL:個|个[ge4] — keep the printable form.
+                    # CL:個|个[ge4] — "traditional|simplified". Comma separates
+                    # several classifiers. Store only the simplified form: keeping
+                    # both made every such row appear twice in entry_classifiers
+                    # (373 duplicated rows in the v2 build).
                     cl = gloss[3:].split("[")[0]
-                    for part in re.split(r"[|,]", cl):
-                        part = part.strip()
-                        if part:
-                            entry.classifiers.append(part)
+                    for group in cl.split(","):
+                        variants = [p.strip() for p in group.split("|") if p.strip()]
+                        if variants:
+                            entry.classifiers.append(variants[-1])
                     continue
                 entry.glosses.append(gloss)
 

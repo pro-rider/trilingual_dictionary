@@ -132,6 +132,33 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/tts-debug'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.workspace_premium_outlined,
+                color: Color(0xFF64748B)),
+            title: const Text('Credits & licences'),
+            subtitle: const Text('CC-CEDICT, Chinese Wiktionary, images'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/credits'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.fact_check_outlined,
+                color: Color(0xFF64748B)),
+            title: const Text('About data quality'),
+            subtitle: const Text('What "reviewed" and "pending" mean'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/data-quality'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined,
+                color: Color(0xFF64748B)),
+            title: const Text('Privacy policy'),
+            subtitle: const Text('What is sent to AI providers, and what is kept'),
+            trailing: const Icon(Icons.open_in_new),
+            // TODO(release): point at the published policy URL before submission.
+            // Kept blank on purpose so nobody ships a dead link silently.
+            onTap: () => _showPrivacySummary(context),
+          ),
           const ListTile(
             title: Text('About'),
             subtitle: Text(
@@ -161,6 +188,35 @@ class SettingsScreen extends ConsumerWidget {
       trailing: TextButton(
         onPressed: () async => controller.signOut(),
         child: const Text('Sign out'),
+      ),
+    );
+  }
+
+  /// The published policy is a `[CONTACT_EMAIL]` draft (docs/PRIVACY_POLICY.md),
+  /// so the app shows the same summary inline instead of linking to a URL that
+  /// does not exist yet.
+  void _showPrivacySummary(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Privacy summary'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Offline by default: the bundled dictionary never leaves the device.\n\n'
+            'AI features are opt-in. When you use one, the text you typed is sent '
+            'to a third-party AI provider to produce a translation or example. '
+            'Nothing else is sent.\n\n'
+            'Results are saved on this device only, together with your favorites '
+            'and search history. The server stores request counts, never your text.\n\n'
+            'The full policy ships with the release build.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

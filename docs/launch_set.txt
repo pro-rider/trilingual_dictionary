@@ -1,0 +1,10 @@
+tier1_hsk: 2477
+tier2_frequency: 2523
+tier3_post_launch: 118672
+total: 123672
+entries_in_db: 123672
+senses_in_launch_set: 14569
+senses_in_db: 198306
+senses_share_pct: 7.35
+duplicate_entry_ids: 0
+digest: 2c85a1e1d1e57bc68415dd23b6aaa5ad468d698e4cf3124dbfcbfb97b5b34c10

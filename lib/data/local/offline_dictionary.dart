@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -62,7 +63,23 @@ class OfflineDictionary {
   /// Nothing the user owns is written into this file: AI glosses and AI example
   /// sentences live in [UserStore] (`user.db`), which this replacement never
   /// touches.
-  static const String assetVersion = 'db-e1118fb343';
+  static const String assetVersion = 'db-212f19b8e2';
+
+  /// Rough on-disk size after unpacking, used only for the storage error text.
+  static const int unpackedMegabytes = 100;
+
+  /// First-launch unpack progress, 0.0 → 1.0. Stage-based rather than
+  /// byte-based: the gzip expand is one isolate call, so it reports 0.05 → 0.6
+  /// and the chunked write reports 0.6 → 1.0. A `ValueListenableBuilder` in the
+  /// launch screen can drive a progress bar straight off this.
+  final ValueNotifier<double> unpackProgress = ValueNotifier<double>(0);
+
+  /// Releases the progress notifier when the dictionary is discarded.
+  void dispose() {
+    unpackProgress.dispose();
+    _db?.close();
+    _db = null;
+  }
 
   /// Test/desktop hook: open an existing database file instead of unpacking
   /// the bundled asset through path_provider.
@@ -138,18 +155,98 @@ class OfflineDictionary {
   }
 
   /// Decompress the bundled asset into the app directory.
+  ///
+  /// Three things this deliberately does, because a 96 MB unpack is the one
+  /// step that can fail on a real phone:
+  ///
+  /// * the bytes are staged in `dictionary.sqlite.part` and only renamed into
+  ///   place after the write succeeded, so a crash or a full disk never leaves
+  ///   a half file that later looks like a usable database;
+  /// * a failure deletes the staged file and records a message that names the
+  ///   storage problem, so the UI can offer "retry" instead of "reinstall";
+  /// * [unpackProgress] is updated in coarse stages (load → expand → write), so
+  ///   the first-launch screen has something honest to show.
   Future<void> _install(File target) async {
-    final data = await rootBundle.load(assetPath);
-    final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-
-    // Decompression of 96 MB is CPU-bound: keep it off the UI isolate.
-    final unpacked = await Isolate.run(() => _gunzip(bytes));
-
     final tmp = File('${target.path}.part');
-    await tmp.writeAsBytes(unpacked, flush: true);
-    await tmp.rename(target.path);
-    await _stamp(target).writeAsString(assetVersion, flush: true);
+    try {
+      unpackProgress.value = 0.05;
+      final data = await rootBundle.load(assetPath);
+      final bytes =
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+
+      // Decompression of 96 MB is CPU-bound: keep it off the UI isolate.
+      final unpacked = await Isolate.run(() => _gunzip(bytes));
+      unpackProgress.value = 0.6;
+
+      // Written in 4 MB chunks: on a nearly-full phone the write fails early
+      // instead of after staging the whole file.
+      final sink = tmp.openWrite();
+      const chunk = 4 << 20;
+      for (var offset = 0; offset < unpacked.length; offset += chunk) {
+        final end = (offset + chunk < unpacked.length)
+            ? offset + chunk
+            : unpacked.length;
+        sink.add(unpacked.sublist(offset, end));
+        unpackProgress.value = 0.6 + 0.4 * (end / unpacked.length);
+      }
+      await sink.flush();
+      await sink.close();
+
+      await tmp.rename(target.path);
+      await _stamp(target).writeAsString(assetVersion, flush: true);
+      unpackProgress.value = 1.0;
+    } catch (e) {
+      _lastError = storageFailure(e);
+      await _discardPartial(target);
+      rethrow;
+    }
   }
+
+  /// Human-readable diagnosis for a failed unpack. `FileSystemException` with
+  /// ENOSPC/EDQUOT is the common case on a full phone; everything else is
+  /// reported verbatim so it can be pasted into a bug report.
+  static String storageFailure(Object error) {
+    final text = error.toString();
+    final lower = text.toLowerCase();
+    if (lower.contains('enospc') || lower.contains('no space') ||
+        lower.contains('edquot') || lower.contains('disk full')) {
+      return 'Not enough free space to unpack the dictionary '
+          '(about $unpackedMegabytes MB is needed). Free some space and tap '
+          'retry.';
+    }
+    if (lower.contains('eacces') || lower.contains('permission')) {
+      return 'The dictionary could not be written to app storage '
+          '(permission denied). Close other apps and tap retry.';
+    }
+    return 'The dictionary could not be unpacked: $text';
+  }
+
+  /// Remove the staged `.part` file and its stamp, so nothing half-written can
+  /// be mistaken for an installed database.
+  Future<void> _discardPartial(File target) async {
+    for (final path in ['${target.path}.part', '${target.path}.stamp']) {
+      try {
+        final file = File(path);
+        if (file.existsSync()) file.deleteSync();
+      } catch (_) {}
+    }
+  }
+
+  /// Retry the first-launch unpack after a failure, discarding partial state.
+  /// Returns true when the database opened, so a UI can branch on the result.
+  Future<bool> retryInstall() async {
+    _opening = null;
+    _lastError = null;
+    unpackProgress.value = 0;
+    await _discardPartial(await _dbFile());
+    final db = await _open();
+    return db != null;
+  }
+
+  /// Exposed for the upgrade test only; production code goes through
+  /// [retryInstall].
+  @visibleForTesting
+  Future<void> discardPartialForTest(File target) => _discardPartial(target);
 
   /// Sidecar file recording which asset build this database came from.
   File _stamp(File dbFile) => File('${dbFile.path}.stamp');
@@ -458,8 +555,10 @@ class OfflineDictionary {
 
     final senseModels = rows.map((s) {
       final gloss = (s['gloss_en'] as String?) ?? '';
-      // CC-CEDICT ships no Chinese gloss; the pink 中文 box used to render
-      // empty. The headword itself is what a Chinese reader wants there.
+      // CC-CEDICT ships no Chinese gloss, and the packaged build only carries
+      // Chinese definitions for a minority of senses. Repeating the headword
+      // there reads as a real definition and hides the gap, so an empty gloss
+      // stays empty and the UI shows its explicit "not available yet" state.
       final dictZh = ((s['gloss_zh'] as String?) ?? '').trim();
       final key = senseKeys[(s['sense_id'] as int?) ?? -1];
       final ai = key == null ? null : overlayGlosses[key];
@@ -475,7 +574,7 @@ class OfflineDictionary {
         ipaEn: '',
         pos: '',
         meaningEn: gloss,
-        meaningZh: effectiveZh.isEmpty ? simplified : effectiveZh,
+        meaningZh: effectiveZh,
         meaningNe: effectiveNe,
         meaningNeStatus:
             reviewed ? 'published' : (effectiveNe.isEmpty ? 'missing' : 'pending'),
@@ -746,7 +845,7 @@ class OfflineDictionary {
           ''),
       pos: ((row['pos_primary'] as String?) ?? ''),
       meaningEn: gloss,
-      meaningZh: dictZh.isNotEmpty ? dictZh : (ai?.zh ?? zh),
+      meaningZh: dictZh.isNotEmpty ? dictZh : (ai?.zh ?? ''),
       meaningNe: dictNe.isNotEmpty ? dictNe : (ai?.ne ?? ''),
       source: 'dataset',
     );
@@ -807,6 +906,30 @@ class OfflineDictionary {
       'ORDER BY ei.rank LIMIT 1',
       [entryPk],
     );
+    if (rows.isNotEmpty) return _imageFromRow(rows.first);
+    // Second chance: the picture belongs to this word's concept family. 玩具 and
+    // 玩意 share one concept, so one curated photograph serves both instead of
+    // leaving the synonym on the placeholder.
+    final family = await _imageForConcept(entryPk);
+    return family;
+  }
+
+  Future<EntryImage?> _imageForConcept(int entryPk) async {
+    final db = await _open();
+    if (db == null) return null;
+    final rows = await db.rawQuery(
+      'SELECT i.image_id, i.thumb_asset, i.detail_url, i.attribution_text, '
+      '       i.license, i.width, i.height, ci.is_primary AS rank '
+      'FROM entry_concepts ec '
+      'JOIN concept_images ci ON ci.concept_id = ec.concept_id '
+      'JOIN images i ON i.image_id = ci.image_id '
+      'WHERE ec.entry_id = ? AND i.status = \'approved\' '
+      "  AND COALESCE(i.asset_status, 'approved') = 'approved' "
+      "  AND i.thumb_asset IS NOT NULL AND i.thumb_asset != '' "
+      'ORDER BY ci.is_primary DESC, ci.relevance DESC, ec.confidence DESC '
+      'LIMIT 1',
+      [entryPk],
+    );
     return rows.isEmpty ? null : _imageFromRow(rows.first);
   }
 
@@ -835,7 +958,22 @@ class OfflineDictionary {
       'ORDER BY ei.rank, conf DESC LIMIT 1',
       [word, word],
     );
-    return rows.isEmpty ? null : _imageFromRow(rows.first);
+    if (rows.isNotEmpty) return _imageFromRow(rows.first);
+    // Nothing indexed under this exact string: try the concept family of any
+    // entry that carries the headword (e.g. 册 shares 书's concept image).
+    final ids = await db.rawQuery(
+      'SELECT entry_id FROM entries '
+      'WHERE simplified = ? OR traditional = ? '
+      'ORDER BY freq_rank IS NULL, freq_rank LIMIT 5',
+      [word, word],
+    );
+    for (final row in ids) {
+      final pk = row['entry_id'];
+      if (pk is! int) continue;
+      final family = await _imageForConcept(pk);
+      if (family != null) return family;
+    }
+    return null;
   }
 
   EntryImage _imageFromRow(Map<String, Object?> row) {

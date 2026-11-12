@@ -23,13 +23,16 @@ Nothing here logs user text: only counts, client keys and status codes.
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 import time
 from pathlib import Path
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # --- tunables, read from the environment on every call so tests and an operator
 # --- can change them without reloading the process -------------------------------
@@ -84,37 +87,63 @@ def require_ai_access(x_ai_token: str | None = Header(default=None, alias="X-AI-
 
 
 class _SlidingWindow:
-    """Per-key timestamps inside one minute, plus a process-wide daily counter."""
+    """Sliding per-minute buckets plus daily counters, per key and global.
+
+    Two budgets exist on purpose: a per-client budget (one device or one IP) and
+    a separate process-wide budget. With only a global counter, a single heavy
+    client takes AI away from everybody else for the rest of the day; with only
+    per-client counters, a botnet or a shared IP can exhaust the provider quota.
+    """
+
+    GLOBAL_KEY = "__global__"
 
     def __init__(self) -> None:
         self._hits: dict[str, list[float]] = {}
+        self._client_day: dict[str, int] = {}
         self._day: str = ""
         self._day_count: int = 0
 
-    def allow(self, key: str, per_minute: int, daily_cap: int, now: float | None = None) -> bool:
-        now = time.monotonic() if now is None else now
+    def _roll_day(self) -> None:
         today = time.strftime("%Y-%m-%d", time.localtime())
         if today != self._day:
             self._day = today
             self._day_count = 0
+            self._client_day.clear()
 
-        if daily_cap > 0 and self._day_count >= daily_cap:
-            return False
+    def allow(self, key: str, per_minute: int, daily_cap: int,
+              global_per_minute: int = 0, global_daily_cap: int = 0,
+              now: float | None = None) -> tuple[bool, str]:
+        """Return (allowed, reason). The reason is for logs, never for the user."""
+        now = time.monotonic() if now is None else now
+        self._roll_day()
 
-        if per_minute > 0:
-            bucket = [t for t in self._hits.get(key, []) if now - t < 60.0]
-            if len(bucket) >= per_minute:
-                self._hits[key] = bucket
-                return False
+        if daily_cap > 0 and self._client_day.get(key, 0) >= daily_cap:
+            return False, "client_daily_cap"
+        if global_daily_cap > 0 and self._day_count >= global_daily_cap:
+            return False, "global_daily_cap"
+
+        for bucket_key, limit, label in (
+            (key, per_minute, "client_rate"),
+            (self.GLOBAL_KEY, global_per_minute, "global_rate"),
+        ):
+            if limit <= 0:
+                continue
+            bucket = [t for t in self._hits.get(bucket_key, []) if now - t < 60.0]
+            if len(bucket) >= limit:
+                self._hits[bucket_key] = bucket
+                return False, label
             bucket.append(now)
-            self._hits[key] = bucket
+            self._hits[bucket_key] = bucket
 
         if daily_cap > 0:
+            self._client_day[key] = self._client_day.get(key, 0) + 1
+        if global_daily_cap > 0:
             self._day_count += 1
-        return True
+        return True, ""
 
     def reset(self) -> None:
         self._hits.clear()
+        self._client_day.clear()
         self._day = ""
         self._day_count = 0
 
@@ -122,16 +151,38 @@ class _SlidingWindow:
 limiter = _SlidingWindow()
 
 
+def _client_key(request: Request, x_client_id: str | None) -> str:
+    """Prefer the app's device id, fall back to the caller's IP address.
+
+    Without the fallback every anonymous caller shares the single key
+    ``anonymous`` and one of them can lock the rest out.
+    """
+    if x_client_id and x_client_id.strip():
+        return "dev:" + x_client_id.strip()[:64]
+    host = ""
+    if request is not None and request.client is not None:
+        host = request.client.host or ""
+    return "ip:" + (host or "unknown")[:64]
+
+
 def enforce_limits(
+    request: Request,
     x_client_id: str | None = Header(default=None, alias="X-Client-Id"),
 ) -> None:
     """Dependency: 429 when a client or the whole process exceeds its quota."""
     per_minute = _env_int("AI_RATE_LIMIT_PER_MIN", settings.ai_rate_limit_per_min)
-    daily_cap = _env_int("AI_DAILY_CAP", settings.ai_daily_cap)
-    if per_minute <= 0 and daily_cap <= 0:
+    daily_cap = _env_int("AI_DAILY_CAP_PER_CLIENT", settings.ai_daily_cap_per_client)
+    global_per_minute = _env_int("AI_RATE_LIMIT_GLOBAL_PER_MIN",
+                                 settings.ai_rate_limit_global_per_min)
+    global_daily_cap = _env_int("AI_DAILY_CAP", settings.ai_daily_cap)
+    if all(v <= 0 for v in (per_minute, daily_cap, global_per_minute, global_daily_cap)):
         return
-    key = (x_client_id or "anonymous").strip()[:64] or "anonymous"
-    if not limiter.allow(key, per_minute, daily_cap):
+    key = _client_key(request, x_client_id)
+    allowed, reason = limiter.allow(
+        key, per_minute, daily_cap, global_per_minute, global_daily_cap
+    )
+    if not allowed:
+        logger.info("ai limit hit: scope=%s key=%s", reason, key)
         raise HTTPException(
             status_code=429,
             detail="Usage limit reached. Please try again later.",

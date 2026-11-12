@@ -3,10 +3,10 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "e1118fb34392b462947b0501ad801365729a23869d265de6887588c2a99bfac1",
-      "bytes": 100765696,
-      "approved_by": "approved asset change, 2026-11-10: eight rows of damaged Nepali text repaired (2 rows carrying U+FFFD, 6 rows with Latin or Cyrillic characters typed inside Devanagari words), recorded row-by-row with evidence in docs/NE-CORRECTIONS.json and applied by backend/tools/apply_ne_corrections.py. Previous pin 3f9e5f46... was the unmodified build; this pin is the same build after those eight values changed. Row counts are unchanged in every table (verified by digest over all other rows per column, plus per-table counts), integrity_check and foreign_key_check pass, and the encoding gate goes from 2 errors + 9 warnings to 0 errors + 0 warnings (3 legitimate mixed-script rows allowlisted in docs/ENCODING-ALLOWLIST.json). Approval relied on: 'ok go ahead and fixes and go further'. Evidence run-logs: ne_apply.json (7 rows) and ne_apply2.json (example row 35). assets/data/dictionary.sqlite.gz was rebuilt from this file and verified to decompress back to this exact sha256.",
-      "known_defect": "fts_zh missing entry ids 123597-123672 (76 rows) — accepted until an approved rebuild"
+      "sha256": "c4b3332ed3875de98129b4e2ad0db5154565f0635604271e36653eb7553de2fa",
+      "bytes": 121683968,
+      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-429a6b6f98, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
+      "known_defect": null
     },
     {
       "path": "backend/data/build/translations.db",

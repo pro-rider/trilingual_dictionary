@@ -1,0 +1,28 @@
+Chinese definition coverage
+============================================================
+senses total          : 198,306
+senses with gloss_zh  : 13,867 (6.99%)
+senses without        : 184,439 (93.01%)
+before this phase     : 0 (0.00%) — every sense was empty
+
+tier 1  senses    7,447  zh filled        0  (0.00%)
+tier 2  senses    7,122  zh filled        0  (0.00%)
+tier 3  senses  183,737  zh filled   13,867  (7.55%)
+
+wiktionary candidates  : 31,760
+imported (provenance)  : 13,867 (43.66%)
+not imported           : 17,893
+
+reason per candidate not imported (re-derived with the importer's own
+gates, so the numbers cannot drift from the tool that made them):
+  multi_sense_entry             14,314
+  gloss_zh_already_present      13,867
+  high_frequency_review_only     1,947
+  definition_quality             1,525
+  launch_set_review_only           107
+
+provenance sources now in senses:
+  zh.wiktionary             13,867
+
+restricted data present in senses? (must all be 0)
+  gloss_zh_candidates: 17,786 rows — internal benchmark only, dropped from the release build

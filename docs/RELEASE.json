@@ -1,0 +1,37 @@
+{
+  "built_at": "2026-11-12T18:07:34",
+  "source_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\dictionary.sqlite",
+  "source_sha256": "03eaa92d78c532f6b2e8895f9b445ba4ea4b4a7b6a0ace0ea958f1f3a8b8fbb6",
+  "release_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\release\\dictionary.release.sqlite",
+  "db_sha256": "429a6b6f989acc4e4dc1f90a5685b171e611a54b59c9694c807280cac4c4bc8a",
+  "db_bytes": 103981056,
+  "packed": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\assets\\data\\dictionary.sqlite.gz",
+  "packed_sha256": "90b97c02bcf964d486777b2f1e9ee188c30b3baee4c2831d6e8d812a36b0cd11",
+  "packed_bytes": 46219545,
+  "asset_version": "db-429a6b6f98",
+  "dart_constant": "static const String assetVersion = 'db-429a6b6f98';",
+  "counts": {
+    "entries": 123672,
+    "senses": 198306,
+    "examples": 392,
+    "images": 77,
+    "fts": 123672,
+    "fts_zh": 123596
+  },
+  "schema_version": "v005",
+  "integrity": "ok",
+  "dropped_tables": [
+    "gloss_zh_candidates",
+    "gloss_zh_wikt_candidates",
+    "words3000_candidates",
+    "example_candidates",
+    "launch_set",
+    "staging_entries",
+    "staging_senses",
+    "corpus_hits",
+    "import_batches",
+    "dictionary_changelog"
+  ],
+  "licence_audit": "clean (see tools/build_release_db.py:audit)",
+  "approval": "PENDING HUMAN REVIEW — see docs/HUMAN_TODO.md"
+}

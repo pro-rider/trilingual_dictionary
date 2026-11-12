@@ -3,9 +3,9 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "23ad3b7b9c2067a4f762d279302c66918b3634f5f035fbd3164209b8413c8e31",
-      "bytes": 122544128,
-      "approved_by": "AI Release Authority — asset APPROVED 2026-11-12T11:03:43Z on commit d67d6e4 (db-8b0db9597b). Working-copy pin moved to 23ad3b7b9c20 (122,544,128 B) by commit after this one, because 7,004 rows were staged into words3000_candidates from the user's raw vocabulary files (source=user-raw-2026-11-12). That table is dropped by tools/build_release_db.py, so the shipped database is unchanged: freshly rebuilding the release DB from this working copy produced byte-different but content-identical tables (tools/compare_release_content.py -> CONTENT IDENTICAL), and the approved asset db-8b0db9597b was kept.",
+      "sha256": "53b03ebafce0eb295ce8e95b056b6873901518dda0c14ebd0b3c920575aa33d5",
+      "bytes": 122621952,
+      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
       "known_defect": null,
       "approved_at_utc": "2026-11-12T11:03:43Z",
       "approved_on_commit": "d67d6e4"

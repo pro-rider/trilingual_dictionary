@@ -63,7 +63,7 @@ class OfflineDictionary {
   /// Nothing the user owns is written into this file: AI glosses and AI example
   /// sentences live in [UserStore] (`user.db`), which this replacement never
   /// touches.
-  static const String assetVersion = 'db-8b0db9597b';
+  static const String assetVersion = 'db-f6008049a2';
 
   /// Rough on-disk size after unpacking, used only for the storage error text.
   static const int unpackedMegabytes = 100;
@@ -906,6 +906,30 @@ class OfflineDictionary {
       'ORDER BY ei.rank LIMIT 1',
       [entryPk],
     );
+    if (rows.isNotEmpty) return _imageFromRow(rows.first);
+    // Second chance: the picture belongs to this word's concept family. 玩具 and
+    // 玩意 share one concept, so one curated photograph serves both instead of
+    // leaving the synonym on the placeholder.
+    final family = await _imageForConcept(entryPk);
+    return family;
+  }
+
+  Future<EntryImage?> _imageForConcept(int entryPk) async {
+    final db = await _open();
+    if (db == null) return null;
+    final rows = await db.rawQuery(
+      'SELECT i.image_id, i.thumb_asset, i.detail_url, i.attribution_text, '
+      '       i.license, i.width, i.height, ci.is_primary AS rank '
+      'FROM entry_concepts ec '
+      'JOIN concept_images ci ON ci.concept_id = ec.concept_id '
+      'JOIN images i ON i.image_id = ci.image_id '
+      'WHERE ec.entry_id = ? AND i.status = \'approved\' '
+      "  AND COALESCE(i.asset_status, 'approved') = 'approved' "
+      "  AND i.thumb_asset IS NOT NULL AND i.thumb_asset != '' "
+      'ORDER BY ci.is_primary DESC, ci.relevance DESC, ec.confidence DESC '
+      'LIMIT 1',
+      [entryPk],
+    );
     return rows.isEmpty ? null : _imageFromRow(rows.first);
   }
 
@@ -934,7 +958,22 @@ class OfflineDictionary {
       'ORDER BY ei.rank, conf DESC LIMIT 1',
       [word, word],
     );
-    return rows.isEmpty ? null : _imageFromRow(rows.first);
+    if (rows.isNotEmpty) return _imageFromRow(rows.first);
+    // Nothing indexed under this exact string: try the concept family of any
+    // entry that carries the headword (e.g. 册 shares 书's concept image).
+    final ids = await db.rawQuery(
+      'SELECT entry_id FROM entries '
+      'WHERE simplified = ? OR traditional = ? '
+      'ORDER BY freq_rank IS NULL, freq_rank LIMIT 5',
+      [word, word],
+    );
+    for (final row in ids) {
+      final pk = row['entry_id'];
+      if (pk is! int) continue;
+      final family = await _imageForConcept(pk);
+      if (family != null) return family;
+    }
+    return null;
   }
 
   EntryImage _imageFromRow(Map<String, Object?> row) {

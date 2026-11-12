@@ -22,6 +22,7 @@ import gzip
 import hashlib
 import shutil
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -253,6 +254,19 @@ def build(*, pack_asset_file: bool = True) -> dict:
 
     db_sha = sha256_file(RELEASE_DB)
     db_bytes = RELEASE_DB.stat().st_size
+
+    # Every approved picture must resolve to a bundled thumbnail. Checking here
+    # means a release can never ship a reference the client cannot render; the
+    # Flutter card would otherwise show the "no picture" icon for a broken path.
+    gate = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("verify_image_assets.py")),
+         "--db", str(RELEASE_DB)],
+        capture_output=True, text=True, encoding="utf-8")
+    if gate.returncode != 0:
+        tail = "\n".join(
+            line for line in gate.stdout.splitlines() if line.startswith("FAIL"))
+        raise SystemExit("image asset gate failed:\n" + (tail or gate.stdout[-800:]))
+
     packed_sha = packed_bytes = None
     version = f"db-{db_sha[:10]}"
     if pack_asset_file:

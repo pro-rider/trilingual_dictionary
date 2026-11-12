@@ -110,6 +110,15 @@ def encoding_gate() -> bool:
                [PY, str(tool), "--db", str(DB), "--strict"], BACKEND)
 
 
+def image_assets() -> bool:
+    print("\n=== image assets (bundled thumbnails) ===")
+    tool = BACKEND / "tools" / "verify_image_assets.py"
+    if not tool.exists():
+        print("--- image assets: SKIP (tool not present)")
+        return True
+    return run("image assets", [PY, str(tool), "--db", str(DB)], BACKEND)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fast", action="store_true", help="skip the Flutter steps")
@@ -124,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     results.append(("licence audit", licence_audit()))
     results.append(("db integrity", db_integrity()))
     results.append(("encoding gate", encoding_gate()))
+    results.append(("image assets", image_assets()))
 
     if not args.fast:
         if FLUTTER is None:

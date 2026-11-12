@@ -1,20 +1,20 @@
 {
-  "built_at": "2026-11-12T19:00:42",
+  "built_at": "2026-11-12T22:49:52",
   "source_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\dictionary.sqlite",
-  "source_sha256": "23ad3b7b9c2067a4f762d279302c66918b3634f5f035fbd3164209b8413c8e31",
+  "source_sha256": "53b03ebafce0eb295ce8e95b056b6873901518dda0c14ebd0b3c920575aa33d5",
   "release_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\release\\dictionary.release.sqlite",
-  "db_sha256": "8b0db9597bc50d0c40639794decbc5117681c8574eb64a0482e34baccd5af20b",
-  "db_bytes": 103993344,
+  "db_sha256": "f6008049a23e62ad5b0dfb4881936f9a8335855f890aa7081fff649ed551fd7d",
+  "db_bytes": 104083456,
   "packed": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\assets\\data\\dictionary.sqlite.gz",
-  "packed_sha256": "69cc37fb5cacc5999e5250c50427f9a09968ae9465ef2f3490bcb29cc0245e8a",
-  "packed_bytes": 46224517,
-  "asset_version": "db-8b0db9597b",
-  "dart_constant": "static const String assetVersion = 'db-8b0db9597b';",
+  "packed_sha256": "799207c09f427087bc8b50f99aa278369d456a808504c898677f2f5771c388f3",
+  "packed_bytes": 46249536,
+  "asset_version": "db-f6008049a2",
+  "dart_constant": "static const String assetVersion = 'db-f6008049a2';",
   "counts": {
     "entries": 123672,
     "senses": 198306,
     "examples": 392,
-    "images": 77,
+    "images": 113,
     "fts": 123672,
     "fts_zh": 123672
   },
@@ -35,15 +35,5 @@
     "dictionary_changelog"
   ],
   "licence_audit": "clean (see tools/build_release_db.py:audit)",
-  "approval": {
-    "status": "APPROVED",
-    "approved_by": "AI Release Authority",
-    "approved_at_utc": "2026-11-12T11:03:43Z",
-    "trigger_commit": "d67d6e4",
-    "scope": "asset integrity, licence cleanliness and release-record consistency only; content completeness and Nepali/Chinese review remain human work tracked in docs/HUMAN_TODO.md",
-    "evidence": "backend/tools/verify_release_asset.py -> ASSET CHAIN VERIFIED: pin matches disk, gz unpacks byte-identical to the release DB, integrity ok, foreign keys clean, no forbidden tables, no xinhua/moedict sense rows, counts match, client stamp matches",
-    "content_review": "PENDING — docs/HUMAN_TODO.md (not part of this approval)"
-  },
-  "source_bytes": 122544128,
-  "source_note": "Working DB re-hashed after a staging-only write (words3000_candidates, 7,004 rows, dropped from the release build). The release DB and packed asset recorded above were NOT rebuilt and remain the approved bytes."
+  "approval": "PENDING HUMAN REVIEW — see docs/HUMAN_TODO.md"
 }

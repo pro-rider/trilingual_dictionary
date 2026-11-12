@@ -24,6 +24,14 @@ import import_review  # noqa: E402
 DB = os.path.join(BACKEND, "data", "build", "dictionary.sqlite")
 HEADERS = import_review.REQUIRED_HEADERS
 
+# The built dictionary is a 122 MB artifact and is not committed, so a clean
+# checkout (CI included) has no database to copy. Skipping is how the rest of
+# the suite handles that (see test_search_ranking.py, test_thumb_asset_paths.py);
+# the test still runs everywhere the artifact exists.
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DB), reason="built dictionary database not present"
+)
+
 
 @pytest.fixture()
 def working_copy(tmp_path):

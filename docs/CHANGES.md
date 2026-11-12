@@ -369,7 +369,7 @@ The 8 failures were triaged, not accepted:
 
 ## Release gate — Part A (workbook exclusion) and fts_zh repair
 
-Run by the release gate on 2026-11-13 (UTC). Both parts are mechanical; the only
+Run by the release gate on 2026-11-12 (UTC). Both parts are mechanical; the only
 human decision left is the content review in docs/HUMAN_TODO.md.
 
 ### Part A — review workbooks

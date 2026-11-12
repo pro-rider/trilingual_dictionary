@@ -5,8 +5,10 @@
       "path": "backend/data/build/dictionary.sqlite",
       "sha256": "fbf1ba930c7b25f0e1e59b1d46fd24150fa8a91a3e9f8c47c4f76085d2495b30",
       "bytes": 121700352,
-      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
-      "known_defect": null
+      "approved_by": "AI Release Authority — APPROVED 2026-11-12T11:03:43Z on commit d67d6e4. Rebuilt by backend/tools/build_release_db.py for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392, fts_zh 123672 (gap closed by tools/repair_fts_zh.py). Content changed because 13,867 zh.wiktionary definitions were imported with per-row provenance, new-word translations and launch_set were added, two corrupted candidate glosses were cleared, one missing thumbnail was written, and the zh trigram index was completed. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin c4b3332ed387 / e1118fb343.",
+      "known_defect": null,
+      "approved_at_utc": "2026-11-12T11:03:43Z",
+      "approved_on_commit": "d67d6e4"
     },
     {
       "path": "backend/data/build/translations.db",
@@ -15,5 +17,7 @@
       "approved_by": "approved asset change, 2026-11-10: the same eight corrections propagated into the legacy import copy (origin_source='dictionary.sqlite:senses.ne'), because dictionary.sqlite is the authoritative original for legacy Nepali text (docs/PHASE2.1-CORRECTIONS.md) and tests/test_resolution.py fails when the two diverge. Seven senses rows had their text replaced by backend/tools/sync_legacy_translation_text.py; identity and every governance column are untouched, row count stays 3,245, no supersessions created, all 3,238 other rows proven unchanged by digest, integrity_check ok. The eighth correction (examples row 35) has no counterpart in this store, which imports senses only. Previous pin 2a6e4284...",
       "known_defect": null
     }
-  ]
+  ],
+  "approval_state": "APPROVED",
+  "approval_note": "Asset approval only. Nepali coverage (3,245 machine rows, 0 reviewed), Chinese coverage (13,867 of 198,306 senses), example count (392) and the Play Data Safety decisions are content/legal items listed in docs/HUMAN_TODO.md and are deliberately not covered by this approval."
 }

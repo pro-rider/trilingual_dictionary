@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -94,8 +95,30 @@ def test_committed_fixture_is_encoding_clean():
 
 # --------------------------------------------------------------------- preflight
 
+GIT_FALLBACKS = (
+    r"C:\Program Files\Git\cmd\git.exe",
+    r"C:\Program Files (x86)\Git\cmd\git.exe",
+)
+
+
+def _git_exe():
+    """Resolve git even when it is installed but not on PATH.
+
+    A Windows box can have Git installed and still hand the test runner a PATH
+    without it; failing five tests over that is a portability defect in the
+    test, not a defect in preflight.
+    """
+    found = shutil.which("git")
+    if found:
+        return found
+    for candidate in GIT_FALLBACKS:
+        if os.path.exists(candidate):
+            return candidate
+    return "git"
+
+
 def _git(repo, *args):
-    result = subprocess.run(["git", *args], cwd=str(repo), capture_output=True,
+    result = subprocess.run([_git_exe(), *args], cwd=str(repo), capture_output=True,
                             text=True, encoding="utf-8")
     assert result.returncode == 0, result.stderr
     return result.stdout

@@ -23,6 +23,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -43,10 +45,32 @@ def sha256_file(path: Path, *, chunk: int = 1 << 20) -> str:
     return digest.hexdigest()
 
 
+GIT_FALLBACKS = (
+    r"C:\Program Files\Git\cmd\git.exe",
+    r"C:\Program Files (x86)\Git\cmd\git.exe",
+)
+
+
+def _git_exe() -> str:
+    """Return a usable git path.
+
+    Windows can have Git installed while the process PATH lacks it. Resolving
+    the executable here keeps 'git missing' from being mistaken for 'tree
+    clean', which would silently turn this gate into a pass-through.
+    """
+    found = shutil.which("git")
+    if found:
+        return found
+    for candidate in GIT_FALLBACKS:
+        if os.path.exists(candidate):
+            return candidate
+    return "git"
+
+
 def _git(repo: Path, *args: str) -> tuple[int, str]:
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(repo), capture_output=True,
+            [_git_exe(), *args], cwd=str(repo), capture_output=True,
             text=True, encoding="utf-8", errors="strict", timeout=120,
         )
     except (OSError, subprocess.SubprocessError) as exc:
@@ -102,9 +126,12 @@ def evaluate(*, repo: Path = REPO, intent: str, allow_dirty: bool = False,
     checks: list[dict] = []
 
     available, changed, detail = tracked_changes(repo)
+    # Unavailable git is an unknown state, not a clean one. Only an explicit
+    # --allow-dirty may proceed without proof.
+    clean_ok = (not changed) if available else False
     checks.append({
         "name": "git_clean",
-        "ok": (not available) or (not changed) or allow_dirty,
+        "ok": clean_ok or allow_dirty,
         "detail": detail or ("%d tracked path(s) modified" % len(changed)),
         "paths": changed[:20],
         "overridden": allow_dirty,

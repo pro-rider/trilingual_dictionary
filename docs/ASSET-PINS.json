@@ -3,9 +3,9 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "c4b3332ed3875de98129b4e2ad0db5154565f0635604271e36653eb7553de2fa",
-      "bytes": 121683968,
-      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-429a6b6f98, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
+      "sha256": "fbf1ba930c7b25f0e1e59b1d46fd24150fa8a91a3e9f8c47c4f76085d2495b30",
+      "bytes": 121700352,
+      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
       "known_defect": null
     },
     {

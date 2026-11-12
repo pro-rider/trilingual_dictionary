@@ -366,3 +366,47 @@ The 8 failures were triaged, not accepted:
   `docs/IMAGE_AUDIT.md`, `docs/RELEASE.json`, `CREDITS.md`,
   `PRIVACY_POLICY.md`, `review/README.md`.
 
+
+## Release gate — Part A (workbook exclusion) and fts_zh repair
+
+Run by the release gate on 2026-11-13 (UTC). Both parts are mechanical; the only
+human decision left is the content review in docs/HUMAN_TODO.md.
+
+### Part A — review workbooks
+
+- eview/ holds 21 workbooks + README.md. .gitignore line 70
+  (/review/*.xlsx) and line 71 (/review/*.csv) keep every binary out of git;
+  git ls-files review returns only eview/README.md, and
+  git ls-files "*.xlsx" "*.csv" is empty.
+- New tool ackend/tools/verify_review_packages.py: parses the row counts
+  declared in eview/README.md, opens every workbook, asserts the Review
+  sheet, the exact 10-column header, the real data-row count, and checks per
+  topic that the part numbering is contiguous. Result: **ALL WORKBOOKS VALID**
+  (21 files, 1,194,560 B, 9,538 data rows).
+- Regenerability proven by re-running ackend/tools/build_review_packages.py,
+  which reproduced all 21 workbooks from the working database and then passed
+  the verifier again — so the documented process, not the current bytes, is what
+  the artefacts depend on.
+
+### fts_zh gap — fixed, not documented away
+
+The zh trigram index predated the 76 AI-generated entries, so headwords
+123,597–123,672 were invisible to Chinese search. docs/ASSET-PINS.json had
+carried known_defect: null, which was wrong: it claimed a clean asset while the
+index was short 76 rows.
+
+- New tool ackend/tools/repair_fts_zh.py re-adds exactly the missing rows
+  (dry-run first, then apply) and refuses to report success unless
+  COUNT(fts_zh) == COUNT(entries).
+- Result: ts_zh 123,596 → **123,672**, missing 0. Working DB
+  121,683,968 → 121,700,352 B, sha256=fbf1ba930c7b….
+- Release pipeline re-run: release DB 103,993,344 B
+  (sha256=8b0db9597bc5…), packed gz 46,224,517 B
+  (sha256=69cc37fb5cac…), ssetVersion=db-8b0db9597b
+  (Dart constant updated by the build itself, so the client cannot ship a stale
+  stamp while the asset changes).
+- New tool ackend/tools/verify_release_asset.py re-derives the whole chain
+  without trusting docs/RELEASE.json: pin vs disk, gz-unpack byte equality vs
+  release DB, integrity + foreign keys, zero forbidden tables, zero
+  unlicensed-source senses, record counts, and the client constant.
+  Result: **ASSET CHAIN VERIFIED**.

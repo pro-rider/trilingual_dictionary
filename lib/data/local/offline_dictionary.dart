@@ -63,7 +63,7 @@ class OfflineDictionary {
   /// Nothing the user owns is written into this file: AI glosses and AI example
   /// sentences live in [UserStore] (`user.db`), which this replacement never
   /// touches.
-  static const String assetVersion = 'db-f6008049a2';
+  static const String assetVersion = 'db-212f19b8e2';
 
   /// Rough on-disk size after unpacking, used only for the storage error text.
   static const int unpackedMegabytes = 100;

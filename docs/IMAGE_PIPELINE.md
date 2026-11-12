@@ -155,3 +155,88 @@ Local first, network only on a miss:
 3. Keep `verify_image_assets.py` in CI so a nested or orphaned thumbnail can
    never reach a release again.
 4. Do not lower the relevance or licence gates to move the percentage.
+
+## 9. Second acquisition tier: Unsplash and Pixabay
+
+Wikimedia carries objects, species and places; it has almost nothing clean and
+modern for everyday nouns, and nothing at all for the rest. `tools/images_multi_source.py`
+adds a second tier behind the same gates, so one picture can still be found for
+a word that Commons cannot illustrate.
+
+The keys live in the environment (`UNSPLASH_ACCESS_KEY`, `PIXABAY_API_KEY`) or in
+`backend/.env`, which `.gitignore` excludes; the tool reads them, uses them only
+to build an `Authorization` header, never prints them and never writes them into
+a file or a log. Without a key it exits with code 2 and says which variable is
+missing, rather than appearing to run. Quota is tracked per source in
+`backend/data/build/api_quota.json` against the published limits (Unsplash demo
+50 calls/hour, Pixabay 100/minute); when a window is spent the tool stops calling
+that source instead of burning requests on 403s.
+
+Acceptance requires a minimum short edge of 600 px, an aspect ratio between 0.5
+and 2.2, and at least one content word of the English gloss present in the
+result's alt text, description, slug or tags. Unsplash is recorded as the
+"Unsplash License" and Pixabay as the "Pixabay Content License", with author,
+source page and an attribution string in `images.attribution_text`; neither
+licence requires credit, both permit redistribution inside an app.
+
+Caching is the point of the tier: the first accepted picture is downloaded once,
+hashed, written as `thumbs/<sha>.webp` (256 px, flat) and `detail/<sha>.webp`
+(1024 px), inserted into `images` / `concept_images` / `entry_concepts` /
+`entry_images`, and from then on the same word and every synonym in its concept
+family are served from the local row with zero further API traffic. A repeat run
+therefore costs nothing for anything already covered.
+
+## 10. The precision failure that a percentage target invites
+
+Two rounds of acquisition in this session produced the same lesson, and it is
+worth recording precisely because the numbers looked better each time.
+
+The first attempt widened the candidate pool with Commons *categories* and treated
+membership in `Category:<gloss>` as evidence of identity. That put a bus
+destination sign (`PSFS since T190.png`) on 第二 ("second") and a rally car
+(`08 Lancia Ypsilon`) on 左右 ("left and right"): a category is a shelf, not a
+description. The bypass is gone; a category may only widen the pool, and the
+lexical gate still has to pass.
+
+The second attempt audited the result with token equality instead of substring
+matching, so `FullMoon2010.jpg` failed the test for the gloss "moon" and a
+correct picture was deleted along with twenty-six others. Substring matching is
+the right test for camel-cased filenames, which is why `tools/audit_image_precision.py`
+uses it and only reports.
+
+Even with both fixed, four links survived every automated gate and still failed
+the only test that matters — would a reader accept this? A Dutch still life for
+历史 ("history"), a single folk-ride photograph for 人们 ("people"), a Cacti
+monitoring screenshot for 网络管理 ("network management") and an untitled personal
+photograph for 行话 ("jargon"). They are now removed with reasons recorded
+(`tools/drop_wrong_images.py`), which is why the shipped set is 109 images serving
+235 entries rather than 113 serving 246.
+
+## 11. Why 90% coverage is not a target that can be met by working harder
+
+Measured on this machine: ~20.5 s per word end to end, ~55% acceptance on a
+hand-picked concrete-noun list, and 123,672 entries of which 235 currently show a
+picture. `tools/_projection.py` turns that into arithmetic:
+
+| band | entries | covered now | need for 90% | attempts at 55% | time at 20.5 s |
+|---|---|---|---|---|---|
+| top 500 | 598 | 32 (5.35%) | 506 | 919 | ~5.2 h |
+| top 1,000 | 1,140 | 68 (5.96%) | 958 | 1,741 | ~9.9 h |
+| top 5,000 | 5,410 | 124 (2.29%) | 4,745 | 8,627 | ~49 h |
+| top 20,000 | 20,916 | 188 (0.90%) | 18,636 | 33,883 | ~193 h |
+| all entries | 123,672 | 235 (0.19%) | 111,305 | 202,373 | **~48 days** |
+
+The obstacle is not hours, it is the corpus. Ninety per cent of all entries means
+finding a photograph for 是, 会, 已经, 这样 and 111,000 of their neighbours —
+verbs, adverbs, function words and bound morphemes for which no correctly
+attributed photograph exists, in any source, at any price. Reaching the number
+would require attaching pictures that mean nothing to the word, which is the one
+outcome the project has explicitly forbidden. The honest ceiling is the
+photographable subset, and the useful target is the band people actually search:
+90% of top-1,000 is ~1,741 attempts, about ten hours of unattended crawling, and
+that is reachable with the pipeline as it stands.
+
+Two further constraints bound the paid tiers even if the keys arrive: Unsplash's
+demo quota is 50 calls/hour, which is 1,200 a day; Pixabay allows 100/minute but
+its content is thin for abstract Mandarin vocabulary. Neither can move an
+entire 123,672-entry corpus, so the ordering that matters is frequency first.

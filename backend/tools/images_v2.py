@@ -874,9 +874,12 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 ok_r, why_r = relevance_verdict(cand, gloss)
                 if not ok_r and from_category:
-                    # Membership in Category:<gloss> is the identity evidence; the
-                    # file name often mentions nothing ("IMG_2231.jpg").
-                    ok_r, why_r = True, ""
+                    # Category membership alone is NOT enough evidence: Category:
+                    # Second is full of unrelated photographs, and it put a
+                    # destination-sign photo on 第二 and a rally car on 左右.
+                    # Membership only widens the candidate pool; the gloss still
+                    # has to appear in the file name or its categories.
+                    ok_r, why_r = False, f"{why_r} (category membership alone rejected)"
                 if not ok_r:
                     why = why_r
                     continue

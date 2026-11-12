@@ -58,7 +58,8 @@ The import tool reads these headers by name, so do not rename them.
 
 Canonical path:
 `C:\Users\Administrator\Desktop\Dictionery\trilingual_dictionary\review\`
-(21 workbooks, 9,538 data rows, 1,194,560 B at the last build).
+(21 workbooks, 9,738 data rows, 1,194,560 B at the last build; re-verified on
+2026-11-12 with `tools/verify_review_packages.py` → `ALL WORKBOOKS VALID`).
 
 They are **build artefacts, not source**. Rebuild all 21 from the working
 database with:

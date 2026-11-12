@@ -1,7 +1,0 @@
-release: approve db-212f19b8e2 after the precision pass
-
-The image set is now 109 pictures serving 235 entries: four links a reader would
-reject were removed, and the thumbnails they used are gone from disk, so the gate
-reports 109 referenced = 109 files = 109 rows, 0 orphans. Chain re-verified
-(working DB 2d98a0ec1ffd8ab4, release 212f19b8e20036be, gz 3a35e99478069ccb,
-schema v005, 0 unlicensed senses).

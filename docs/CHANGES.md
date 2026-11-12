@@ -89,3 +89,69 @@ The 8 failures were triaged, not accepted:
 - Suite: 310 passed, 1 failed — the asset pin, deliberately left for Phase 7
   where the release database is rebuilt and re-pinned from its content hash.
 - Not verified: none of the Phase 0 items are unverified.
+
+## Phase 1 — launch set
+
+### Verified
+
+- `tools/build_launch_set.py` builds `launch_set(entry_id, tier, reason)`
+  (drop with `--drop`, report without writing with `--report-only`).
+
+| tier | rows | rule |
+|---|---|---|
+| 1 | 2,477 | every entry with `hsk_level` |
+| 2 | 2,523 | next by `freq_rank`, so tiers 1+2 = 5,000 |
+| 3 | 118,672 | everything else, post-launch |
+
+- Launch-set senses: **14,569 of 198,306 (7.35%)**. That share is why
+  review-first work on the launch set is worth more than bulk coverage.
+- Duplicate entry ids: 0. Digest `2c85a1e1…` (sha256 over `entry_id:tier`), so
+  any drift shows up as a changed digest.
+- `tests/test_launch_set.py` (4 tests) guards completeness, the HSK↔tier-1
+  identity, the 5,000 bound, and digest reproducibility.
+- `docs/launch_set.txt` written with the same numbers.
+
+## Phase 2 — Chinese definitions from zh.wiktionary
+
+### Verified
+
+- `tools/import_wiktionary_zh.py`, source `zh.wiktionary` (CC BY-SA 4.0), every
+  imported sense recorded in a new `gloss_provenance` table
+  (sense_id, entry_id, source, license, license_url, method, confidence, run_id,
+  applied_at).
+- Gates applied (all must hold): title equals the entry's simplified or
+  traditional form; the entry has exactly one sense; `gloss_zh` still empty;
+  4–120 characters after normalisation; no `{{`/`[[`/`ref=`/`|`; not a
+  "见…/参见…/另见…" stub; contains Chinese characters; not in the top-10,000 by
+  frequency; not in launch tiers 1–2. Text converted Traditional → Simplified
+  with OpenCC and the conversion is recorded as the method.
+
+| outcome | rows |
+|---|---|
+| accepted and imported | 13,867 (high 9,xxx / medium 4,xxx) |
+| rejected: entry has several senses | 14,314 |
+| rejected: top-10,000 frequency → review | 1,947 |
+| rejected: definition failed quality gates | 1,525 |
+| rejected: in launch tiers 1–2 → review | 107 |
+
+- Coverage before → after: **0 → 13,867 senses, 0.0% → 6.99%** of all senses.
+  Launch-set coverage stays **0.0%** deliberately: every launch-set candidate is
+  routed to human review (Phase 4), because for those words the Wiktionary gloss
+  lists classical meanings first.
+- Cancel the "Xinhua" worry: `gloss_zh_candidates` (17,786 rows, license_risk
+  high) was not touched, and `tests/test_wiktionary_import.py` asserts that the
+  only source in `gloss_provenance` is `zh.wiktionary` with a non-ND license.
+- `tests/test_wiktionary_import.py` (5 tests): provenance can't go orphaned, no
+  wiki syntax reaches `senses`, no gloss equals the bare headword, no
+  top-10,000 entry was auto-imported, no Xinhua/MoEDict source.
+
+### Client (empty state)
+
+- `lib/data/local/offline_dictionary.dart`: a missing Chinese gloss used to be
+  filled with the headword itself ("the headword is what a Chinese reader wants
+  there" — wrong, it hides the gap and reads as a definition). Both the search
+  path and the analyze path now pass the empty string through, so
+  `TrilingualBlock` shows its existing explicit missing state ("—" or
+  "Translate now") instead of a fake gloss.
+- `flutter analyze` → **No issues found**.
+

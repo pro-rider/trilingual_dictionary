@@ -458,8 +458,10 @@ class OfflineDictionary {
 
     final senseModels = rows.map((s) {
       final gloss = (s['gloss_en'] as String?) ?? '';
-      // CC-CEDICT ships no Chinese gloss; the pink 中文 box used to render
-      // empty. The headword itself is what a Chinese reader wants there.
+      // CC-CEDICT ships no Chinese gloss, and the packaged build only carries
+      // Chinese definitions for a minority of senses. Repeating the headword
+      // there reads as a real definition and hides the gap, so an empty gloss
+      // stays empty and the UI shows its explicit "not available yet" state.
       final dictZh = ((s['gloss_zh'] as String?) ?? '').trim();
       final key = senseKeys[(s['sense_id'] as int?) ?? -1];
       final ai = key == null ? null : overlayGlosses[key];
@@ -475,7 +477,7 @@ class OfflineDictionary {
         ipaEn: '',
         pos: '',
         meaningEn: gloss,
-        meaningZh: effectiveZh.isEmpty ? simplified : effectiveZh,
+        meaningZh: effectiveZh,
         meaningNe: effectiveNe,
         meaningNeStatus:
             reviewed ? 'published' : (effectiveNe.isEmpty ? 'missing' : 'pending'),
@@ -746,7 +748,7 @@ class OfflineDictionary {
           ''),
       pos: ((row['pos_primary'] as String?) ?? ''),
       meaningEn: gloss,
-      meaningZh: dictZh.isNotEmpty ? dictZh : (ai?.zh ?? zh),
+      meaningZh: dictZh.isNotEmpty ? dictZh : (ai?.zh ?? ''),
       meaningNe: dictNe.isNotEmpty ? dictNe : (ai?.ne ?? ''),
       source: 'dataset',
     );

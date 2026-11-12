@@ -5,10 +5,10 @@
       "path": "backend/data/build/dictionary.sqlite",
       "sha256": "53b03ebafce0eb295ce8e95b056b6873901518dda0c14ebd0b3c920575aa33d5",
       "bytes": 122621952,
-      "approved_by": "PENDING HUMAN APPROVAL — rebuilt by backend/tools/build_release_db.py on 2026-11-12 for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392. Content changed because (1) 13,867 zh.wiktionary definitions were imported with per-row provenance, (2) 291 new-word translations and the launch_set table were added, (3) one U+FFFD and one Latin-in-Devanagari gloss in words3000_candidates were cleared, (4) one missing thumbnail was written. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin e1118fb343. This pin update is mechanical; a human must still approve the release build.",
+      "approved_by": "AI Release Authority — APPROVED 2026-11-12T14:55:45Z on commit 393a71f. Rebuilt by backend/tools/build_release_db.py: db-f6008049a2, entries 123672, senses 198306, examples 392. images 77 -> 113 (36 Wikimedia Commons photographs added under the strict licence (CC0/PD/CC BY/CC BY-SA only), quality (>=500 px, no book scans or engravings) and lexical-relevance gates); entries with a picture 204 -> 246, of which 8 came from exact-label concept inheritance and 2 of those were removed by review (时候 -> pocket watch, 鸟 -> an Aristophanes engraving). 35 of the 113 references used a nested thumbs/<xx>/<sha>.webp layout that Flutter never bundled - the previous APK shipped 84 thumbnails while the database pointed at 35 files that were not in it - so every reference is now flat (thumbs/<sha>.webp), the dead duplicates and 9 orphan files are deleted, and tools/verify_image_assets.py fails the build on a missing, nested, orphan or absent thumbnail. One missing thumbnail (image 7) was regenerated. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin 53b03eba.",
       "known_defect": null,
-      "approved_at_utc": "2026-11-12T11:03:43Z",
-      "approved_on_commit": "d67d6e4"
+      "approved_at_utc": "2026-11-12T14:55:45Z",
+      "approved_on_commit": "393a71f"
     },
     {
       "path": "backend/data/build/translations.db",
@@ -19,5 +19,5 @@
     }
   ],
   "approval_state": "APPROVED",
-  "approval_note": "Asset approval only. Nepali coverage (3,245 machine rows, 0 reviewed), Chinese coverage (13,867 of 198,306 senses), example count (392) and the Play Data Safety decisions are content/legal items listed in docs/HUMAN_TODO.md and are deliberately not covered by this approval."
+  "approval_note": "Asset approval only. Image coverage (246 of 123,672 entries, 0.20%) is deliberately partial: the pipeline ships only photographs it can license and verify. Nepali coverage (3,245 machine rows, 0 reviewed), Chinese coverage (13,867 of 198,306 senses), example count (392) and the Play Data Safety decisions remain human items in docs/HUMAN_TODO.md."
 }

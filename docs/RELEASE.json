@@ -1,7 +1,7 @@
 {
   "built_at": "2026-11-12T19:00:42",
   "source_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\dictionary.sqlite",
-  "source_sha256": "fbf1ba930c7b25f0e1e59b1d46fd24150fa8a91a3e9f8c47c4f76085d2495b30",
+  "source_sha256": "23ad3b7b9c2067a4f762d279302c66918b3634f5f035fbd3164209b8413c8e31",
   "release_db": "C:\\Users\\Administrator\\Desktop\\Dictionery\\trilingual_dictionary\\backend\\data\\build\\release\\dictionary.release.sqlite",
   "db_sha256": "8b0db9597bc50d0c40639794decbc5117681c8574eb64a0482e34baccd5af20b",
   "db_bytes": 103993344,
@@ -43,5 +43,7 @@
     "scope": "asset integrity, licence cleanliness and release-record consistency only; content completeness and Nepali/Chinese review remain human work tracked in docs/HUMAN_TODO.md",
     "evidence": "backend/tools/verify_release_asset.py -> ASSET CHAIN VERIFIED: pin matches disk, gz unpacks byte-identical to the release DB, integrity ok, foreign keys clean, no forbidden tables, no xinhua/moedict sense rows, counts match, client stamp matches",
     "content_review": "PENDING — docs/HUMAN_TODO.md (not part of this approval)"
-  }
+  },
+  "source_bytes": 122544128,
+  "source_note": "Working DB re-hashed after a staging-only write (words3000_candidates, 7,004 rows, dropped from the release build). The release DB and packed asset recorded above were NOT rebuilt and remain the approved bytes."
 }

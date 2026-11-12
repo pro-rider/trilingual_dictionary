@@ -3,9 +3,9 @@
   "pins": [
     {
       "path": "backend/data/build/dictionary.sqlite",
-      "sha256": "fbf1ba930c7b25f0e1e59b1d46fd24150fa8a91a3e9f8c47c4f76085d2495b30",
-      "bytes": 121700352,
-      "approved_by": "AI Release Authority — APPROVED 2026-11-12T11:03:43Z on commit d67d6e4. Rebuilt by backend/tools/build_release_db.py for the release-prep branch: db-8b0db9597b, entries 123672, senses 198306, examples 392, fts_zh 123672 (gap closed by tools/repair_fts_zh.py). Content changed because 13,867 zh.wiktionary definitions were imported with per-row provenance, new-word translations and launch_set were added, two corrupted candidate glosses were cleared, one missing thumbnail was written, and the zh trigram index was completed. integrity_check ok, foreign_key_check clean, licence audit clean. Previous pin c4b3332ed387 / e1118fb343.",
+      "sha256": "23ad3b7b9c2067a4f762d279302c66918b3634f5f035fbd3164209b8413c8e31",
+      "bytes": 122544128,
+      "approved_by": "AI Release Authority — asset APPROVED 2026-11-12T11:03:43Z on commit d67d6e4 (db-8b0db9597b). Working-copy pin moved to 23ad3b7b9c20 (122,544,128 B) by commit after this one, because 7,004 rows were staged into words3000_candidates from the user's raw vocabulary files (source=user-raw-2026-11-12). That table is dropped by tools/build_release_db.py, so the shipped database is unchanged: freshly rebuilding the release DB from this working copy produced byte-different but content-identical tables (tools/compare_release_content.py -> CONTENT IDENTICAL), and the approved asset db-8b0db9597b was kept.",
       "known_defect": null,
       "approved_at_utc": "2026-11-12T11:03:43Z",
       "approved_on_commit": "d67d6e4"

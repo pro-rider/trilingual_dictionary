@@ -94,3 +94,26 @@ backend\.venv\Scripts\python.exe backend\tools\backup_db.py     # backup + check
 ```
 
 `make` targets exist for the same four commands if `make` is installed.
+
+---
+
+## 8. Auth system (branch `auth-system`) — human-only steps
+
+Phase 1 is four **unapplied** migration files under `supabase/migrations/`,
+described in `docs/AUTH-SCHEMA.md`. Nothing below can be done by an agent:
+each step needs an account, a DNS record or a legal judgement.
+
+| # | Step | Blocks | Notes |
+|---|---|---|---|
+| 1 | Create the Supabase project and record the project ref | Phase 1 apply, Phase 2 | Free tier covers launch volumes |
+| 2 | Decide the JWT signing mode: keep the legacy **HS256** secret, or move to asymmetric keys | Phase 2 | `backend/app/core/security.py` assumes HS256 today; with asymmetric keys the backend must verify against the project's JWKS instead |
+| 3 | Apply the four migrations (`supabase db push`, or paste each file in the SQL editor **in filename order**) | Phase 2 | — |
+| 4 | Enable `pg_cron` (Database → Extensions) before step 3 | retention | Without it the migrations still succeed with a notice; the three purge functions then need a FastAPI scheduler |
+| 5 | Add custom SMTP (Resend / Brevo / SendGrid) under Authentication → Emails; set code expiry to 10 minutes | Phase 4 | One template for signup **and** reset — the wording must not reveal whether an address exists |
+| 6 | Publish SPF, DKIM and DMARC for the sending subdomain | launch | Without them codes land in spam and signup looks broken |
+| 7 | Put the **service-role** key and the JWT secret in Vercel server-side env and `backend/.env` only | Phase 2 | Never in `lib/`, never in git — `SECURITY.md` already states this |
+| 8 | Register the web origin exactly in the CORS allowlist, plus the mobile deep-link scheme | Phase 4 | Wildcards are refused by design |
+| 9 | Choose the web login host: Next.js on Vercel, or the Flutter web build | Phase 4 | The Flutter web target in this repo does not boot today (`dart:io`, `path_provider`, `sqflite`), so this is a real fork — answer needed before Phase 4 |
+| 10 | Legal review of the privacy-policy wording for `security_events` (salted IP hashes, 30-day retention) | launch | The promise must match migration 3 exactly |
+| 11 | Penetration test before public launch | launch | Required by the brief |
+

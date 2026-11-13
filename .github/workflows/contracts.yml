@@ -74,5 +74,45 @@ jobs:
           python-version: "3.12"
       - name: Install psycopg
         run: pip install -r backend/requirements.txt
-      - name: Migration checks (up, 21 checks, down)
+      - name: Migration checks (up, every check, down)
         run: python supabase/tests/run_migration_checks.py
+
+  supabase-local-stack:
+    # The real Supabase stack in Docker: real GoTrue, a real auth schema, real
+    # auth.uid() and JWT-based RLS. This is what "VERIFIED (local Supabase)"
+    # means — a hosted project is still needed for pg_cron and e-mail.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start the local stack
+        run: supabase start -x vector,imgproxy,studio,realtime,storage-api,edge-runtime,logflare
+      - name: Apply every migration
+        run: supabase db reset --local
+      - name: Export the local stack's keys
+        run: |
+          set -a
+          supabase status -o env > /tmp/sb.env
+          # shellcheck disable=SC1091
+          source /tmp/sb.env
+          set +a
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+          echo "exported: $API_URL"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the client
+        run: pip install -r backend/requirements.txt
+      - name: Real RLS, real JWT and refresh rotation
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: python supabase/tests/run_local_stack_checks.py
+      - name: Stop the stack
+        if: always()
+        run: supabase stop --no-backup

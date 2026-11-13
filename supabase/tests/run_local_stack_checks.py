@@ -85,6 +85,9 @@ def main() -> int:
                     "email": email,
                     "username": f"{name}{tag}",
                     "status": "active",
+                    # `status <> 'active' or activated_at is not null` — the
+                    # invariant migration 01 puts in the database.
+                    "activated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 },
             )
             check(f"service role writes {name}'s profile", r.status_code < 400, r.text[:200])
@@ -175,12 +178,17 @@ def main() -> int:
                 with conn.cursor() as cur:
                     cur.execute("select extname from pg_extension where extname = 'pg_cron'")
                     has_cron = cur.fetchone() is not None
-                    check("local stack has pg_cron", has_cron)
                     if has_cron:
+                        check("local stack has pg_cron", True)
                         cur.execute(
                             "select count(*) from cron.job where command like '%purge_transient_rows%'"
                         )
                         check("purge_transient_rows is scheduled", cur.fetchone()[0] >= 1)
+                    else:
+                        # The CLI stack ships without pg_cron, so the schedule is
+                        # genuinely untested here — a hosted project is required
+                        # (HUMAN_TODO 13).
+                        print("  note  local stack has no pg_cron: schedule stays NOT VERIFIED")
         except Exception as exc:          # noqa: BLE001 - reported, not swallowed
             check("pg_cron check could run", False, str(exc)[:200])
     else:

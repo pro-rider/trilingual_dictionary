@@ -42,8 +42,14 @@ enable_signup = false
 enable_anonymous_sign_ins = false
 
 [auth.email]
-enable_signup = false
-enable_confirmations = true
+# The e-mail provider must stay enabled for password sign-in (FastAPI calls
+# GoTrue with the service role); the global `enable_signup = false` above is
+# what refuses public self-service registration. Setting this to false disables
+# the provider outright ("email_provider_disabled").
+enable_signup = true
+# Accounts are created by the admin API with email_confirm=true, so the local
+# stack must not require a confirmation link before a password sign-in works.
+enable_confirmations = false
 
 [auth.sms]
 enable_signup = false

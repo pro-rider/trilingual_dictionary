@@ -4,8 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/normalizer.dart';
-import '../../core/supabase_config.dart';
-import '../../data/auth_provider.dart';
 import 'settings_provider.dart';
 
 /// Settings screen (v1): theme, text size, UI language, default input
@@ -115,15 +113,13 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/favorites'),
           ),
-          if (SupabaseConfig.isConfigured)
-            _accountTile(context, ref)
-          else
-            ListTile(
-              leading: const Icon(Icons.cloud_off, color: LanguageColors.brand),
-              title: const Text('Sign in (Supabase)'),
-              subtitle: const Text('Cloud sync — not configured yet'),
-              onTap: () => context.push('/auth'),
-            ),
+          ListTile(
+            leading: const Icon(Icons.login, color: Color(0xFF64748B)),
+            title: const Text('Account'),
+            subtitle: const Text('Not open yet — works offline without one'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/auth'),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.record_voice_over, color: Color(0xFF64748B)),
@@ -165,29 +161,6 @@ class SettingsScreen extends ConsumerWidget {
                 'Trilingual Dictionary v0.1\nEnglish · 中文 · नेपाली\nDataset v${AppConstants.datasetVersion}'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _accountTile(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authUserProvider).value;
-    final controller = ref.read(authControllerProvider);
-    if (auth == null) {
-      return ListTile(
-        leading: const Icon(Icons.login, color: LanguageColors.brand),
-        title: const Text('Sign in'),
-        subtitle: const Text('Sync favorites across devices'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/auth'),
-      );
-    }
-    return ListTile(
-      leading: const Icon(Icons.account_circle, color: LanguageColors.brand),
-      title: Text(auth.email.isEmpty ? 'Signed in' : auth.email),
-      subtitle: const Text('Signed in'),
-      trailing: TextButton(
-        onPressed: () async => controller.signOut(),
-        child: const Text('Sign out'),
       ),
     );
   }

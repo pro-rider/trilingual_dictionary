@@ -84,9 +84,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      # npm, not supabase/setup-cli: the action resolves "latest" through the
+      # GitHub API from a shared runner IP and dies on "rate limit exceeded".
+      - uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: "20"
+      - name: Install the Supabase CLI
+        run: npm install --global supabase@2
+      - name: CLI version
+        run: supabase --version
       - name: Start the local stack
         run: supabase start -x vector,imgproxy,studio,realtime,storage-api,edge-runtime,logflare
       - name: Apply every migration

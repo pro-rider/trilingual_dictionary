@@ -123,10 +123,18 @@ class MemoryAuthStore(AuthStore):
         self.profiles.pop(user_id, None)
 
     def anonymize_events(self, user_id: str) -> int:
+        """Null the identifiers that can still point at one person.
+
+        `user_id` alone is not enough: a stable `device_id` links the remaining
+        rows back to a single handset for the whole 30-day window, which is a
+        pseudonym, not an anonymisation.
+        """
         changed = 0
         for event in self.events:
             if event.get("user_id") == user_id:
                 event["user_id"] = None
+                event["device_id"] = None
+                event["ip_hash"] = None
                 changed += 1
         return changed
 
@@ -278,7 +286,12 @@ class PgAuthStore(AuthStore):
 
     def anonymize_events(self, user_id: str) -> int:
         with self._connect() as conn, conn.cursor() as cur:
-            cur.execute("update public.security_events set user_id = null where user_id = %s", (user_id,))
+            cur.execute(
+                "update public.security_events "
+                "set user_id = null, device_id = null, ip_hash = null "
+                "where user_id = %s",
+                (user_id,),
+            )
             return cur.rowcount
 
     def delete_profile(self, user_id: str) -> None:

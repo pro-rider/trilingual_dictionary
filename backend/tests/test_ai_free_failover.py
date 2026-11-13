@@ -1,4 +1,4 @@
-﻿"""Tests for the strict free-only 20-slot failover system (no network).
+"""Tests for the strict free-only 20-slot failover system (no network).
 
 Every test injects its own stub caller, so nothing here hits a provider and no
 credential is needed. The registry tests assert *counts and policy*, never that
@@ -216,7 +216,7 @@ def test_quota_daily_cap_blocks_pool(monkeypatch):
 
 
 def test_secret_is_redacted_in_stats(monkeypatch):
-    secret = "sk-live-SECRETSECRET1234"
+    secret = "fixture-not-a-real-key-0000"
     monkeypatch.setenv("K_A", secret)
     a = make_ep(1, "a:free", env="K_A")
     stub = Stub([AuthFailed(f"bad key {secret}")])

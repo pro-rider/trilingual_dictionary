@@ -118,5 +118,7 @@ each step needs an account, a DNS record or a legal judgement.
 | 11 | Penetration test before public launch | launch | Required by the brief |
 | 12 | Publish the **static account-deletion page** and enter its URL in Play Console → Data deletion | launch | Per A21: the page describes the in-app path (`DELETE /auth/account`) and the email fallback; it does not delete anything itself |
 | 13 | Give the staging project URL, anon key, service-role key and signing mode to run `supabase/tests/run_migration_checks.py` against real Supabase | Phase 2 | Without these the staging run stays NOT VERIFIED (A23) |
-
-
+| 14 | **Disable public sign-up in Supabase** (Authentication → Providers → Email → "Allow new users to sign up" OFF) | launch | With no anon key in the app (A24) nothing can reach `/auth/v1/signup` anyway, but the switch removes the path entirely if a key ever leaks |
+| 15 | If any APK, internal test build or Play upload ever contained a Supabase URL + anon key, **treat that key as public**: rotate it, then confirm sign-up is off | launch | Removing the code later does not un-ship it. `lib/core/supabase_config.dart` never held a real value and is now deleted; only you know whether an earlier build shipped |
+| 16 | Set `AUTH_CODE_PEPPER` (≥ 16 random chars) in the FastAPI environment | Phase 2 | The flow returns 503 "Auth not configured" without it, rather than hashing a 6-digit code with an empty key |
+| 17 | Set `TRUSTED_PROXIES` to your proxy CIDRs (or leave empty when FastAPI is the only hop) | Phase 3 | Until this matches the real edge, per-IP limits count either the proxy or a spoofable header (`backend/tests/test_net.py` proves the ignore-path) |

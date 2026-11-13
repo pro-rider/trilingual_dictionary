@@ -95,6 +95,12 @@ def _no_breach_lookup(monkeypatch):
     monkeypatch.setattr(auth_flow.passwords, "is_breached", lambda _password, timeout=3.0: False)
 
 
+@pytest.fixture(autouse=True)
+def _pepper(monkeypatch):
+    """A deployed site must set this; the flow refuses to run without it."""
+    monkeypatch.setattr(settings, "auth_code_pepper", "test-pepper-" + "x" * 24)
+
+
 @pytest.fixture()
 def store() -> MemoryAuthStore:
     return MemoryAuthStore()
@@ -317,9 +323,9 @@ def test_delete_with_wrong_password_is_refused(client, store, admin, auth_client
 def test_delete_removes_identity_and_leaves_no_personal_data(client, store, admin, auth_client):
     store.create_profile(ProfileRow(user_id="uid-1", email="a@b.c", username="anna", status="active"))
     store.events = [
-        {"event_type": "LOGIN_FAILED", "user_id": "uid-1", "ip_hash": "h1"},
-        {"event_type": "LOGIN_FAILED", "user_id": "uid-1", "ip_hash": "h2"},
-        {"event_type": "LOGIN_FAILED", "user_id": "uid-2", "ip_hash": "h3"},
+        {"event_type": "LOGIN_FAILED", "user_id": "uid-1", "ip_hash": "h1", "device_id": "dev-1"},
+        {"event_type": "LOGIN_FAILED", "user_id": "uid-1", "ip_hash": "h2", "device_id": "dev-1"},
+        {"event_type": "LOGIN_FAILED", "user_id": "uid-2", "ip_hash": "h3", "device_id": "dev-2"},
     ]
     r = client.request(
         "DELETE", "/api/v1/auth/account",
@@ -329,8 +335,28 @@ def test_delete_removes_identity_and_leaves_no_personal_data(client, store, admi
     assert r.status_code == 200, r.text
     assert admin.deleted == ["uid-1"]
     assert store.profile_by_user_id("uid-1") is None
-    assert all(e["user_id"] != "uid-1" for e in store.events)
-    assert len([e for e in store.events if e["ip_hash"] in ("h1", "h2")]) == 2  # signal kept
+
+    # The row survives as evidence, but nothing in it points at one person any
+    # more: no uid, no device, no stable IP hash.
+    mine = [e for e in store.events if e["event_type"] == "LOGIN_FAILED" and e["ip_hash"] is None]
+    assert len(mine) == 2
+    assert all(e["user_id"] is None and e["device_id"] is None for e in mine)
+    other = [e for e in store.events if e["user_id"] == "uid-2"]
+    assert len(other) == 1 and other[0]["device_id"] == "dev-2"
+
+
+def test_no_pepper_means_503_not_a_weaker_code(monkeypatch):
+    """Without the pepper a 6-digit code is guessable from a DB dump."""
+    from app.core.config import settings as live_settings
+
+    live_settings.auth_code_pepper = ""
+    from starlette.testclient import TestClient as _TC
+
+    from app.main import app as live_app
+
+    r = _TC(live_app).post("/api/v1/auth/register/start", json={"email": "pepper@example.com"})
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Auth not configured"
 
 
 def test_delete_logs_no_password_or_token(client, store, auth_client, caplog):

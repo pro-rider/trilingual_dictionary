@@ -43,9 +43,19 @@ class RegisterConflict(Exception):
     pass
 
 
+class AuthNotConfigured(Exception):
+    """No pepper means a 6-digit code is brute-forceable from a DB dump."""
+
+
+def pepper() -> str:
+    value = settings.auth_code_pepper
+    if len(value) < 16:
+        raise AuthNotConfigured("AUTH_CODE_PEPPER must be set")
+    return value
+
+
 def email_hash(email: str) -> str:
-    pepper = settings.auth_code_pepper
-    return hashlib.sha256(f"auth-email:{email.strip().lower()}:{pepper}".encode()).hexdigest()
+    return hashlib.sha256(f"auth-email:{email.strip().lower()}:{pepper()}".encode()).hexdigest()
 
 
 def register_start(store: AuthStore, email: str, *, purpose: str = "signup", now: float | None = None) -> StartResult:
@@ -68,7 +78,7 @@ def register_start(store: AuthStore, email: str, *, purpose: str = "signup", now
     code = otp.issue_code()
     new_challenge = Challenge(
         email_hash=key,
-        code_hash=otp.hash_code(code, settings.auth_code_pepper),
+        code_hash=otp.hash_code(code, pepper()),
         expires_at=now + settings.auth_code_ttl_minutes * 60,
         purpose=purpose,
         attempts=0,
@@ -94,7 +104,7 @@ def register_verify(store: AuthStore, email: str, raw_code: str, *, purpose: str
 
     submitted = otp.normalize_code(raw_code)
     if submitted is None or not otp.code_matches(
-        submitted, challenge.code_hash, settings.auth_code_pepper
+        submitted, challenge.code_hash, pepper()
     ):
         store.bump_attempts(key, purpose)
         return VerifyResult(ok=False, reason="invalid_or_expired")

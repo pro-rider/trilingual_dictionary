@@ -28,7 +28,8 @@ enabled = false
 [studio]
 enabled = false
 
-[inbucket]
+[local_smtp]
+# Capture-only SMTP for the local stack (the CLI's successor to [inbucket]).
 enabled = true
 port = 54324
 

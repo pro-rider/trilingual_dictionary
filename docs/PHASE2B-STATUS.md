@@ -32,7 +32,7 @@ phone→跑分, beautiful→那). None is auth-related; the reasons are pinned i
 | 4 | AI endpoints: Option B — guest allowance keyed by IP + install id, larger per-user allowance, global budget, no `X-Client-Id` bucketing, IPv6 /64 | **DONE**, **VERIFIED (fakes)** | `backend/app/core/ai_guard.py` `_identity_buckets()`; a valid bearer token → `user:<uid>`; otherwise `guest:<ip bucket>:<install hash>` **and** `guest-net:<ip bucket>` with a multiplier, so rotating the header buys one bucket, not unlimited quota; IPv6 collapsed to /64; tests in `test_ai_phase6_hardening.py` (`test_ipv6_is_counted_per_64_not_per_address`, `test_rotating_the_install_id_still_hits_the_network_bucket`, `test_a_valid_token_moves_the_caller_to_the_user_budget`) |
 | 5 | Dedicated tests: login by username **and** email, pending account cannot log in, dummy-hash path runs, register/complete ACTIVE-only + reserved names + username policy, `nepali_enabled` | **DONE**, **VERIFIED (fakes)** | `backend/tests/test_auth_phase2b.py`: `test_login_by_username_and_by_email_both_succeed`, `test_a_pending_account_cannot_log_in`, `test_an_unknown_username_still_makes_one_upstream_call`, `test_complete_creates_an_active_profile_only_there`, `test_reserved_usernames_are_refused` (3 params), `test_username_policy_is_enforced` (3 params), `test_nepali_enabled_is_visible_and_not_settable_by_patch` |
 | 5b | Login timing equality against a **real** backend | **NOT VERIFIED** | With a fake upstream there is no network latency to compare. What is proven is that an unknown identifier still performs exactly one password grant (`test_an_unknown_username_still_makes_one_upstream_call`) |
-| 6 | Supabase CLI local stack in CI; label results "VERIFIED (local Supabase)" | **DONE**, running in CI | `.github/workflows/contracts.yml` job `supabase-local-stack`; `supabase/config.toml` (public sign-up off); `supabase/tests/run_local_stack_checks.py` asserts anon cannot read profiles, a real JWT sees only its own row, cross-user read fails, refresh rotates and a replayed refresh token fails after 12 s, and (when the DB port is reachable) that pg_cron is present and the purge job is scheduled |
+| 6 | Supabase CLI local stack in CI; label results "VERIFIED (local Supabase)" | **VERIFIED (local Supabase)** — job green on `affc86c`, 12 checks passed | `.github/workflows/contracts.yml` job `supabase-local-stack`; `supabase/config.toml` (public sign-up off); `supabase/tests/run_local_stack_checks.py` asserts anon cannot read profiles, a real JWT sees only its own row, cross-user read fails, refresh rotates and a replayed refresh token fails after 12 s, and (when the DB port is reachable) that pg_cron is present and the purge job is scheduled. Two findings: the CLI stack ships without pg_cron (schedule stays **NOT VERIFIED**), and GoTrue still exchanges a replayed refresh token after 40 s, so refresh-reuse revocation is ours, not Supabase's (A30) |
 | 7 | Status table against every item of Prompts A, B, C | **DONE** | Section 2 below |
 | 8 | What behaviour was removed with the old Supabase client | **DONE** | Section 3 below |
 | 9 | Deletion also removes challenges/signup tokens; `details_json`/`endpoint` hold no identifiers; blocklist rows for a deleted user; update A29 | **DONE** for the code, **DONE** for the audit | Section 4 below; `test_deletion_removes_challenges_and_signup_tokens`; A29 extended |
@@ -89,12 +89,12 @@ Legend: A = product/auth behaviour, B = security, C = delivery/verification.
 | Security events persisted to Postgres | B | **NOT DONE** | Phase 3; today `obs` writes stdout only |
 | Upload validation / security agent | B | **NOT DONE** | Phase 3 |
 | Migrations apply cleanly, 22 checks, down migrations, up→down→up | C | **VERIFIED (scratch Postgres)** | `run_migration_checks.py`; `supabase/rollback/*` |
-| Real RLS with a real JWT | C | **VERIFIED (local Supabase)** once CI is green | `run_local_stack_checks.py` |
+| Real RLS with a real JWT | C | **VERIFIED (local Supabase)** | `run_local_stack_checks.py` in CI: anon sees nothing, a real JWT sees only its own row, a cross-user read by id fails |
 | pg_cron schedule on the real project | C | **NOT VERIFIED** | local stack check exists; a hosted plan is needed for the real schedule |
 | Hosted staging run | C | **BLOCKED** | no URL/anon key/service-role key/secret (A23) |
 | Full-history secret scan | C | **VERIFIED (local)** | gitleaks 8.30.1, full history, 0 findings; allowlist pinned to one commit + one path + one literal |
 | PR discipline (auth-system only, no merge to main) | C | **DONE** | PR #2 targets `auth-system`; nothing is merged to `main`; no release cut from this branch |
-| Run on a real phone | C | **NOT DONE** | See section 6 |
+| Run on a real phone | C | **DONE** — Samsung SM-M166P (Android 16, API 36), debug APK | Installed over USB, launched, dictionary copied (99 MB in `files/`), no Flutter exception in logcat, `FLAG_SECURE` confirmed by the phone returning a black screenshot. Detail in section 6 |
 
 ## 3. What was removed with the old Supabase client
 
@@ -189,3 +189,38 @@ backend\.venv\Scripts\python.exe supabase\tests\run_local_stack_checks.py
 # disposable list (deploy-time artifact, not committed)
 backend\.venv\Scripts\python.exe backend\tools\update_disposable_domains.py
 ```
+
+## 7. Run on the phone
+
+Device: Samsung **SM-M166P**, Android 16 (API 36). Debug APK, backend reached over USB
+(`adb reverse tcp:8000 tcp:8000`, so the app's default `http://127.0.0.1:8000` lands on the
+PC's FastAPI without either device sharing a network).
+
+```powershell
+# once: Windows Developer Mode must be ON, or `flutter pub get` dies creating plugin symlinks
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" `
+  -Name AllowDevelopmentWithoutDevLicense -Value 1 -Type DWord
+
+& "C:\flutter\bin\flutter.bat" build apk --debug
+adb install -r build\app\outputs\flutter-apk\app-debug.apk
+adb reverse tcp:8000 tcp:8000
+adb shell am start -n com.example.trilingual_dictionary/.MainActivity
+```
+
+Evidence collected:
+
+* the activity is in focus (`mCurrentFocus`), process alive, no Flutter exception in `logcat`
+  (only Samsung `mali_gralloc` noise, which every Flutter app on this GPU logs);
+* `files/` holds `dictionary.sqlite` (99 MB total), `profileInstalled`, and a live
+  `user.db` + `user.db-journal` — the offline dictionary is installed and the app is writing
+  favourites/history locally;
+* a phone-to-PC request reached FastAPI through the USB mapping
+  (`GET /api/v1/health 200` logged from `127.0.0.1`), so login and AI calls will work on the
+  device without hosting anything;
+* `FLAG_SECURE` is active: `adb exec-out screencap` returns a black frame, which is exactly
+  the behaviour the hardening commit was for (screenshots and the recents thumbnail are
+  blocked by design, so visual checks need the phone's own screen).
+
+Not exercised on the phone yet: signup/login (the account screen is a Phase 4 placeholder),
+AI fallback (needs provider keys), and anything about a restart surviving the in-memory
+token — that is the `flutter_secure_storage` item in Phase 4.

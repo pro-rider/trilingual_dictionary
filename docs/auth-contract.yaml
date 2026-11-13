@@ -97,6 +97,31 @@ endpoints:
     body: {email: string, code: string, password: string}
     responses: [200, 400, 502]
 
+  - method: POST
+    path: /api/v1/auth/password/change
+    auth: bearer + X-Device-Id
+    body: {current_password: string, new_password: string}
+    responses: [204, 400, 403, 404, 502]
+    notes: "Signed-in password change. Requires the current password; revokes every session, including the caller's."
+
+  - method: GET
+    path: /api/v1/auth/sessions
+    auth: bearer + X-Device-Id
+    responses: [200, 401]
+    notes: "Device label, created_at and last_seen per session. No IP, no token, no e-mail."
+
+  - method: POST
+    path: /api/v1/auth/logout-all
+    auth: bearer + X-Device-Id
+    responses: [204, 401]
+    notes: "Revokes every session row; the next request from any device gets 401."
+
+  - method: DELETE
+    path: /api/v1/auth/sessions/{session_id}
+    auth: bearer + X-Device-Id
+    responses: [204, 401, 404]
+    notes: "Sign one other device out by id from GET /auth/sessions."
+
 removed_from_v1:
   - "web cookie session + CSRF double-submit (mobile only, A20)"
   - "Google sign-in (A22): no dependency, no client IDs, no provider config"

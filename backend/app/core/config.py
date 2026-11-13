@@ -134,6 +134,22 @@ class Settings(BaseSettings):
     auth_code_pepper: str = ""
     auth_signup_token_ttl_seconds: int = 900
     auth_send_window_seconds: int = 3600
+    # FastAPI owns sessions (A30): Supabase's free plan gives no per-device
+    # listing and no time-boxing, so both clocks are enforced here.
+    auth_session_idle_days: int = 7
+    auth_session_absolute_days: int = 30
+
+    # Guest vs signed-in AI allowance (option B). Guests are keyed by install
+    # id plus the IP bucket; signed-in users by their user id.
+    ai_guest_daily_cap: int = 30
+    ai_user_daily_cap: int = 200
+    # Rotating an install id must not buy unlimited quota: the whole /64 or
+    # single address also has a ceiling, this many times the guest cap.
+    ai_guest_bucket_multiplier: int = 5
+
+    # Disposable-email domains: a bundled list, plus an explicit allow override
+    # for domains a real user has been wrongly blocked on.
+    auth_disposable_allow_domains: str = ""
 
     # Resend is the SMTP side of "Supabase Auth with a custom SMTP provider".
     resend_api_key: str = ""

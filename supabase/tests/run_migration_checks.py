@@ -190,6 +190,55 @@ def main() -> int:
 
         check("reserved handles seeded (31)", c_reserved)
 
+        def c_sessions():
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select column_name, data_type, is_nullable "
+                    "from information_schema.columns "
+                    "where table_schema='public' and table_name='auth_sessions' "
+                    "order by ordinal_position"
+                )
+                cols = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+            expected = {
+                "session_id", "user_id", "family_id", "device_hash",
+                "device_label", "created_at", "last_seen",
+                "absolute_expires_at", "revoked_at",
+            }
+            assert set(cols) == expected, f"unexpected columns: {sorted(cols)}"
+            assert cols["session_id"][0] == "text"
+            assert cols["user_id"][1] == "NO"
+            assert cols["absolute_expires_at"][0].startswith("timestamp")
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select indexname from pg_indexes "
+                    "where schemaname='public' and tablename='auth_sessions'"
+                )
+                names = {row[0] for row in cur.fetchall()}
+            assert "auth_sessions_active_device_uq" in names, f"missing unique index: {names}"
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select relrowsecurity from pg_class "
+                    "where oid = 'public.auth_sessions'::regclass"
+                )
+                assert cur.fetchone()[0] is True, "RLS is off on auth_sessions"
+                cur.execute(
+                    "select count(*) from pg_policies "
+                    "where schemaname='public' and tablename='auth_sessions'"
+                )
+                assert cur.fetchone()[0] == 0, "auth_sessions must be deny-all to clients"
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select pg_get_functiondef(oid) from pg_proc "
+                    "where proname='purge_transient_rows'"
+                )
+                body = cur.fetchone()[0]
+            assert "auth_sessions" in body, "purge_transient_rows does not clean sessions"
+
+        check("auth_sessions: columns, unique device index, RLS deny-all, purged", c_sessions)
+
         def c_policies():
             with conn.cursor() as cur:
                 cur.execute("select tablename, policyname from pg_policies where schemaname='public'")

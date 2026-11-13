@@ -48,6 +48,41 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+RESERVED_USERNAMES = frozenset((
+    "admin",
+    "administrator",
+    "root",
+    "sysadmin",
+    "system",
+    "support",
+    "help",
+    "helpdesk",
+    "staff",
+    "moderator",
+    "mod",
+    "official",
+    "security",
+    "billing",
+    "sales",
+    "api",
+    "www",
+    "mail",
+    "ftp",
+    "null",
+    "undefined",
+    "anonymous",
+    "guest",
+    "user",
+    "test",
+    "demo",
+    "trilingual",
+    "dictionary",
+    "nepali",
+    "ceo",
+    "founder",
+))
+
+
 def normalize_username(username: str) -> str:
     """Lower-case and strip. The client may show the original casing later."""
     return username.strip().lower()
@@ -79,3 +114,12 @@ def validate_profile_update(fields: dict[str, object]) -> dict[str, object]:
         else:
             cleaned[key] = value
     return cleaned
+
+
+def is_reserved(username: str) -> bool:
+    """Mirror of `reserved_usernames` (migration 04).
+
+    The table is the operational source of truth; this copy keeps the check
+    testable without Postgres and fails closed if they ever drift apart.
+    """
+    return normalize_username(username) in RESERVED_USERNAMES

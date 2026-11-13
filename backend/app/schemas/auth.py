@@ -89,3 +89,28 @@ class UsernameAvailability(StrictModel):
 
 class MessageResponse(StrictModel):
     detail: str
+
+
+class SessionSummary(StrictModel):
+    """What the app may show about a device: a label and two timestamps."""
+
+    session_id: str
+    device_label: str
+    created_at: float
+    last_seen: float
+    current: bool = False
+
+
+class SessionListResponse(StrictModel):
+    sessions: list[SessionSummary]
+
+
+class PasswordChangeRequest(StrictModel):
+    """Changing a password from inside a signed-in app, not by e-mail code.
+
+    The current password is required, so a stolen access token alone cannot
+    rotate the password and lock the owner out.
+    """
+
+    current_password: StrictStr = Field(min_length=8, max_length=128)
+    new_password: StrictStr = Field(min_length=8, max_length=128)

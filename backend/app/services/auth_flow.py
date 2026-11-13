@@ -132,6 +132,8 @@ def register_complete(
     problems = profiles.username_shape_errors(normalized)
     if problems:
         raise ValueError(problems[0])
+    if profiles.is_reserved(normalized):
+        raise ValueError("that username is reserved")
     if store.username_taken(normalized):
         raise RegisterConflict("username unavailable")
 

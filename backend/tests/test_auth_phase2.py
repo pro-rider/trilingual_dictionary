@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from app.api.v1 import auth as auth_module
 from app.core.config import settings
 from app.main import app
-from app.services import auth_flow
+from app.services import auth_flow, sessions
 from app.services.auth_store import MemoryAuthStore, ProfileRow
 
 SECRET = "test-secret"
@@ -132,15 +132,21 @@ def client(store, mailer, admin, auth_client, monkeypatch):
     app.dependency_overrides[auth_module.get_store] = lambda: store
     app.dependency_overrides[auth_module.get_admin] = lambda: admin
     app.dependency_overrides[auth_module.get_auth_client] = lambda: auth_client
+    # Every authenticated route now requires a live session for this device.
+    sessions.create(store, user_id="uid-1", device_id=DEVICE, device_label="test phone")
     yield TestClient(app)
     app.dependency_overrides.clear()
 
 
-def token_for(uid: str, email: str = "a@b.c") -> dict[str, str]:
+DEVICE = "test-device"
+
+
+def token_for(uid: str, email: str = "a@b.c", device: str = DEVICE) -> dict[str, str]:
+    """A signed-in client: JWT plus the install id the session is keyed by."""
     value = jwt.encode(
         {"sub": uid, "email": email, "exp": time.time() + 3600}, SECRET, algorithm="HS256"
     )
-    return {"Authorization": f"Bearer {value}"}
+    return {"Authorization": f"Bearer {value}", "X-Device-Id": device}
 
 
 def _start_and_read_code(client, mailer, email: str) -> str:

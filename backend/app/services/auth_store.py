@@ -49,8 +49,62 @@ class AuthStore:
     def create_profile(self, profile: ProfileRow): ...
     def update_profile(self, user_id: str, fields: dict[str, object]): ...
     def username_taken(self, username: str) -> bool: ...
+    def create_session(self, session) -> None:
+        self.sessions[session.session_id] = session
+
+    def session_by_id(self, session_id: str):
+        return self.sessions.get(session_id)
+
+    def session_for_device(self, user_id: str, device_hash: str):
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.device_hash == device_hash \
+                    and session.revoked_at is None:
+                return session
+        return None
+
+    def list_sessions(self, user_id: str):
+        return [s for s in self.sessions.values() if s.user_id == user_id]
+
+    def touch_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None:
+            session.last_seen = now
+
+    def revoke_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = now
+
+    def revoke_all_sessions(self, user_id: str, now: float) -> int:
+        count = 0
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.revoked_at is None:
+                session.revoked_at = now
+                count += 1
+        return count
+
+    def purge_identity_traces(self, *, email: str, email_hash: str) -> int:
+        """Remove every pre-account trace of this address (A29)."""
+        removed = 0
+        for key in [k for k in self.challenges if k[0] == email_hash]:
+            self.challenges.pop(key, None)
+            removed += 1
+        for token, (stored_email, _exp) in list(self.signup_tokens.items()):
+            if stored_email == email.strip().lower():
+                self.signup_tokens.pop(token, None)
+                removed += 1
+        return removed
+
     def anonymize_events(self, user_id: str) -> int: ...
     def delete_profile(self, user_id: str): ...
+    def create_session(self, session): ...
+    def session_by_id(self, session_id: str): ...
+    def session_for_device(self, user_id: str, device_hash: str): ...
+    def list_sessions(self, user_id: str): ...
+    def touch_session(self, session_id: str, now: float): ...
+    def revoke_session(self, session_id: str, now: float): ...
+    def revoke_all_sessions(self, user_id: str, now: float) -> int: ...
+    def purge_identity_traces(self, *, email: str, email_hash: str) -> int: ...
 
 
 class MemoryAuthStore(AuthStore):
@@ -61,6 +115,7 @@ class MemoryAuthStore(AuthStore):
         self.signup_tokens: dict[str, tuple[str, float]] = {}
         self.profiles: dict[str, ProfileRow] = {}
         self.events: list[dict[str, object]] = []
+        self.sessions: dict[str, object] = {}
 
     def get_challenge(self, email_hash: str, purpose: str = "signup"):
         return self.challenges.get((email_hash, purpose))
@@ -121,6 +176,52 @@ class MemoryAuthStore(AuthStore):
 
     def delete_profile(self, user_id: str) -> None:
         self.profiles.pop(user_id, None)
+
+    def create_session(self, session) -> None:
+        self.sessions[session.session_id] = session
+
+    def session_by_id(self, session_id: str):
+        return self.sessions.get(session_id)
+
+    def session_for_device(self, user_id: str, device_hash: str):
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.device_hash == device_hash \
+                    and session.revoked_at is None:
+                return session
+        return None
+
+    def list_sessions(self, user_id: str):
+        return [s for s in self.sessions.values() if s.user_id == user_id]
+
+    def touch_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None:
+            session.last_seen = now
+
+    def revoke_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = now
+
+    def revoke_all_sessions(self, user_id: str, now: float) -> int:
+        count = 0
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.revoked_at is None:
+                session.revoked_at = now
+                count += 1
+        return count
+
+    def purge_identity_traces(self, *, email: str, email_hash: str) -> int:
+        """Remove every pre-account trace of this address (A29)."""
+        removed = 0
+        for key in [k for k in self.challenges if k[0] == email_hash]:
+            self.challenges.pop(key, None)
+            removed += 1
+        for token, (stored_email, _exp) in list(self.signup_tokens.items()):
+            if stored_email == email.strip().lower():
+                self.signup_tokens.pop(token, None)
+                removed += 1
+        return removed
 
     def anonymize_events(self, user_id: str) -> int:
         """Null the identifiers that can still point at one person.
@@ -284,6 +385,52 @@ class PgAuthStore(AuthStore):
     def username_taken(self, username: str) -> bool:
         return self.profile_by_username(username) is not None
 
+    def create_session(self, session) -> None:
+        self.sessions[session.session_id] = session
+
+    def session_by_id(self, session_id: str):
+        return self.sessions.get(session_id)
+
+    def session_for_device(self, user_id: str, device_hash: str):
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.device_hash == device_hash \
+                    and session.revoked_at is None:
+                return session
+        return None
+
+    def list_sessions(self, user_id: str):
+        return [s for s in self.sessions.values() if s.user_id == user_id]
+
+    def touch_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None:
+            session.last_seen = now
+
+    def revoke_session(self, session_id: str, now: float) -> None:
+        session = self.sessions.get(session_id)
+        if session is not None and session.revoked_at is None:
+            session.revoked_at = now
+
+    def revoke_all_sessions(self, user_id: str, now: float) -> int:
+        count = 0
+        for session in self.sessions.values():
+            if session.user_id == user_id and session.revoked_at is None:
+                session.revoked_at = now
+                count += 1
+        return count
+
+    def purge_identity_traces(self, *, email: str, email_hash: str) -> int:
+        """Remove every pre-account trace of this address (A29)."""
+        removed = 0
+        for key in [k for k in self.challenges if k[0] == email_hash]:
+            self.challenges.pop(key, None)
+            removed += 1
+        for token, (stored_email, _exp) in list(self.signup_tokens.items()):
+            if stored_email == email.strip().lower():
+                self.signup_tokens.pop(token, None)
+                removed += 1
+        return removed
+
     def anonymize_events(self, user_id: str) -> int:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
@@ -297,3 +444,99 @@ class PgAuthStore(AuthStore):
     def delete_profile(self, user_id: str) -> None:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute("delete from public.profiles where user_id = %s", (user_id,))
+
+    # ------------------------------------------------------------------ sessions
+
+    _SESSION_COLUMNS = (
+        "session_id, user_id, family_id, device_hash, device_label, "
+        "created_at, last_seen, absolute_expires_at, revoked_at"
+    )
+
+    def create_session(self, session) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into public.auth_sessions "
+                "(session_id, user_id, family_id, device_hash, device_label, "
+                " created_at, last_seen, absolute_expires_at) "
+                "values (%s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), "
+                "to_timestamp(%s))",
+                (
+                    session.session_id, session.user_id, session.family_id,
+                    session.device_hash, session.device_label,
+                    session.created_at, session.last_seen, session.absolute_expires_at,
+                ),
+            )
+
+    def _session_row(self, cur):
+        return self._row_to_session(cur.fetchone())
+
+    def session_by_id(self, session_id: str):
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {self._SESSION_COLUMNS} from public.auth_sessions "
+                "where session_id = %s", (session_id,),
+            )
+            return self._session_row(cur)
+
+    def session_for_device(self, user_id: str, device_hash: str):
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {self._SESSION_COLUMNS} from public.auth_sessions "
+                "where user_id = %s and device_hash = %s and revoked_at is null "
+                "order by created_at desc limit 1",
+                (user_id, device_hash),
+            )
+            return self._session_row(cur)
+
+    def list_sessions(self, user_id: str):
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {self._SESSION_COLUMNS} from public.auth_sessions "
+                "where user_id = %s order by created_at desc", (user_id,),
+            )
+            return [self._row_to_session(row) for row in cur.fetchall()]
+
+    @staticmethod
+    def _row_to_session(row):
+        from app.services.sessions import Session
+
+        if row is None:
+            return None
+        return Session(
+            session_id=row[0], user_id=str(row[1]), family_id=row[2],
+            device_hash=row[3], device_label=row[4],
+            created_at=row[5].timestamp(), last_seen=row[6].timestamp(),
+            absolute_expires_at=row[7].timestamp(),
+            revoked_at=row[8].timestamp() if row[8] else None,
+        )
+
+    def touch_session(self, session_id: str, now: float) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update public.auth_sessions set last_seen = to_timestamp(%s) "
+                "where session_id = %s", (now, session_id),
+            )
+
+    def revoke_session(self, session_id: str, now: float) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update public.auth_sessions set revoked_at = coalesce(revoked_at, to_timestamp(%s)) "
+                "where session_id = %s", (now, session_id),
+            )
+
+    def revoke_all_sessions(self, user_id: str, now: float) -> int:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update public.auth_sessions set revoked_at = to_timestamp(%s) "
+                "where user_id = %s and revoked_at is null", (now, user_id),
+            )
+            return cur.rowcount
+
+    def purge_identity_traces(self, *, email: str, email_hash: str) -> int:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("delete from public.auth_challenges where email_hash = %s", (email_hash,))
+            removed = cur.rowcount
+            cur.execute(
+                "delete from public.auth_signup_tokens where email = %s", (email.strip().lower(),)
+            )
+            return removed + cur.rowcount

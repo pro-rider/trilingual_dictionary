@@ -111,9 +111,12 @@ each step needs an account, a DNS record or a legal judgement.
 | 4 | Enable `pg_cron` (Database → Extensions) before step 3 | retention | Without it the migrations still succeed with a notice; the three purge functions then need a FastAPI scheduler |
 | 5 | Add custom SMTP (Resend / Brevo / SendGrid) under Authentication → Emails; set code expiry to 10 minutes | Phase 4 | One template for signup **and** reset — the wording must not reveal whether an address exists |
 | 6 | Publish SPF, DKIM and DMARC for the sending subdomain | launch | Without them codes land in spam and signup looks broken |
-| 7 | Put the **service-role** key and the JWT secret in Vercel server-side env and `backend/.env` only | Phase 2 | Never in `lib/`, never in git — `SECURITY.md` already states this |
-| 8 | Register the web origin exactly in the CORS allowlist, plus the mobile deep-link scheme | Phase 4 | Wildcards are refused by design |
-| 9 | Choose the web login host: Next.js on Vercel, or the Flutter web build | Phase 4 | The Flutter web target in this repo does not boot today (`dart:io`, `path_provider`, `sqflite`), so this is a real fork — answer needed before Phase 4 |
+| 7 | Put the **service-role** key and the JWT secret in the FastAPI host's environment (`backend/.env` locally) only | Phase 2 | Never in `lib/`, never in git — `docs/SECURITY.md` states this |
+| 8 | Register the mobile deep-link scheme in Supabase (Authentication → URL configuration) | Phase 4 | No web origin is needed while web is deferred (A20) |
+| 9 | Deferred: choose the web login host (Next.js on Vercel vs the Flutter web build) | later | Superseded by A20 — mobile only for now. The Flutter web target still does not boot today (`dart:io`, `path_provider`, `sqflite`) |
 | 10 | Legal review of the privacy-policy wording for `security_events` (salted IP hashes, 30-day retention) | launch | The promise must match migration 3 exactly |
 | 11 | Penetration test before public launch | launch | Required by the brief |
+| 12 | Publish the **static account-deletion page** and enter its URL in Play Console → Data deletion | launch | Per A21: the page describes the in-app path (`DELETE /auth/account`) and the email fallback; it does not delete anything itself |
+| 13 | Give the staging project URL, anon key, service-role key and signing mode to run `supabase/tests/run_migration_checks.py` against real Supabase | Phase 2 | Without these the staging run stays NOT VERIFIED (A23) |
+
 

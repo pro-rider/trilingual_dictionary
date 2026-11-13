@@ -112,6 +112,21 @@ class Settings(BaseSettings):
     # issued by Supabase Auth in the /me + favorites + feedback endpoints.
     supabase_url: str = ""
     supabase_jwt_secret: str = ""
+    # Server-side only. Used for admin operations (delete a user, revoke
+    # sessions). It must never reach a client; see docs/SECURITY.md.
+    supabase_service_role_key: str = ""
+
+    # Auth policy (docs/AUTH-SCHEMA.md). Values are enforced in code and, where
+    # they are invariants, in Postgres too.
+    auth_code_ttl_minutes: int = 10
+    auth_max_code_attempts: int = 5
+    auth_resend_cooldown_seconds: int = 60
+    auth_max_emails_per_hour: int = 5
+    auth_lockout_steps_seconds: str = "60,300,900"
+    auth_username_min_length: int = 3
+    auth_username_max_length: int = 20
+    auth_password_min_length: int = 8
+    auth_password_max_length: int = 128
 
 
 settings = Settings()

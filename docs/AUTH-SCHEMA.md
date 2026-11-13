@@ -1,8 +1,10 @@
 # AUTH-SCHEMA.md — Phase 1: identity schema, RLS, retention
 
-Status: **migrations written and executed against a scratch PostgreSQL, not
-applied to a Supabase project.** Phase 1 is "verified locally, not deployed".
-Ordering and the human-only steps are in `docs/HUMAN_TODO.md`.
+Status: **migrations written, executed and rolled back against a scratch
+PostgreSQL; not applied to a Supabase project.** Phase 1 is "verified locally,
+not deployed". Real-project verification is blocked on credentials, see §5.
+Ordering and the human-only steps are in `docs/HUMAN_TODO.md`. Web is deferred
+and the product is mobile-only for now (A20/A21).
 
 Files: `supabase/migrations/2026111309*.sql` (4 files, applied in filename
 order). The migrations assume Supabase primitives — the `auth` schema, the
@@ -94,26 +96,75 @@ and its `execute` is revoked from `anon` and `authenticated`.
 
 ## 5. What was verified, and how
 
-The four files were executed against a **scratch database** (`auth_migration_check`,
-created and dropped by the verification script; the real project database was
-never touched), with `auth.users`, `auth.uid()` and the three Supabase roles
-stubbed because a bare PostgreSQL does not have them.
+### What the "scratch database" is, exactly
 
-Passed:
+`supabase/tests/run_migration_checks.py` creates a database named
+`auth_migration_check` on the local PostgreSQL instance the backend already
+talks to (`postgresql://postgres:postgres@localhost:5432`), applies the four
+migrations, runs the checks, applies the four rollbacks, then **drops the
+database**. It refuses to run against a non-local host unless `--allow-remote`
+is passed, because "create and drop a database" against a real Supabase
+project is a destructive act performed by a test.
+
+Because a bare PostgreSQL has no `auth` schema, the script stubs exactly three
+Supabase primitives: `auth.users(id, email, created_at, raw_user_meta_data)`,
+`auth.uid()` (reading `current_setting('test.uid')`, so a check can act as a
+given user) and the `anon` / `authenticated` / `service_role` roles. No other
+piece of Supabase is simulated: `pg_cron` is genuinely absent, which exercises
+the migration's "extension missing" branch.
+
+The project database, `trilingual_dictionary`, is never written to.
+
+### Running the checks
+
+```powershell
+# from the repository root — one command
+backend\.venv\Scripts\python.exe supabase\tests\run_migration_checks.py
+```
+
+Options: `--keep` leaves the database for inspection, `--dsn` overrides the
+connection string, `--allow-remote` permits a non-local host (not for staging).
+
+### Verified (20 checks, all passing)
 
 - all four migrations execute; 31 reserved handles seeded; every table has RLS
   on; **exactly one** policy in `public`
 - pending profile accepted; `status='active'` without `activated_at` **rejected**
 - `Anna` then `anna` **rejected** as a duplicate
+- a second pending row for one email **rejected** — no shadow identity can exist
 - an agent block of 2 hours **rejected**; 40 minutes accepted
-- unknown `event_type` **rejected**
+- unknown `event_type` **rejected**; `details` over 4 KB **rejected**
 - `purge_pending_accounts()` removed a 25-hour-old pending signup together with
-  its `auth.users` row, and kept the fresh one
-- `purge_security_events()` and `purge_transient_rows()` execute
+  its `auth.users` row, kept the fresh one, and **left a 40-day-old ACTIVE
+  account untouched**
+- an `authenticated` client **cannot insert** a pending profile (so an attacker
+  cannot squat a signup row for someone else's address)
+- an `authenticated` user reading `profiles` sees **only their own row**
+- an `authenticated` client cannot read `security_events`, `blocklist`,
+  `security_proposals` or `auth_rate_limits`
+- `purge_security_events()` deletes the 31-day row and keeps the 29-day one
+- deleting `auth.users` **cascades** to `profiles` (the DB half of account deletion)
+- the four rollbacks remove every table, function and policy
 
-Not verified, because it requires the real project: SMTP delivery, the
-`pg_cron` branch, and behaviour under `anon`/`authenticated` JWTs issued by
-Supabase Auth (Phase 5 covers those with real keys).
+### Not verified: real staging project
+
+No Supabase project exists for this repository yet, and this machine holds no
+credentials for one: `backend/.env` defines `SUPABASE_URL` and
+`SUPABASE_JWT_SECRET` but both values are empty, and there is no
+`SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY` anywhere. Running this on a
+real project therefore needs, from you:
+
+1. the staging project URL,
+2. the **anon** key (used by the client and by the JWT-scoped tests),
+3. the **service-role** key (server only), and
+4. the JWT signing mode — legacy HS256 secret, or asymmetric keys with a JWKS
+   endpoint.
+
+With those, the same script can run in "staging mode" against the real
+project: apply the migrations with `supabase db push`, then run the RLS half
+with the anon key and a real user JWT instead of the stubs. The script's checks
+are already written against roles, so they only need a different connection
+identity.
 
 ## 6. SMTP notes (setup, not code)
 

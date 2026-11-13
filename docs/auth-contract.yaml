@@ -1,0 +1,104 @@
+# auth-contract.yaml — the mobile-only auth contract.
+# FastAPI is the only surface the app talks to. No Supabase URL or key ships in
+# the APK (A24); no cookies, no CSRF, no browser flows (A20).
+#
+# `backend/tests/test_auth_contract.py` reads this file and fails if the router
+# and this list disagree, in either direction.
+version: 1
+client: mobile-flutter
+transports:
+  - https
+credentials:
+  access_token: "Authorization: Bearer <supabase access token>"
+  refresh_token: "returned by /auth/login, /auth/refresh, /auth/register/complete"
+  storage: "flutter_secure_storage on device; the backend never sets a cookie"
+
+endpoints:
+  - method: POST
+    path: /api/v1/auth/register/start
+    auth: none
+    body: {email: string}
+    responses: [202]
+    notes: "Identical body and timing for known and unknown addresses; mail is a background task."
+
+  - method: POST
+    path: /api/v1/auth/register/verify
+    auth: none
+    body: {email: string, code: "6 digits"}
+    responses: [200, 400]
+    notes: "5 attempts per code; a valid unexpired code still works after the send cap."
+
+  - method: POST
+    path: /api/v1/auth/register/complete
+    auth: none
+    body: {signup_token: string, username: string, password: string}
+    responses: [200, 400, 401, 409]
+    notes: "The only place an identity is created. Requires a token from /verify."
+
+  - method: POST
+    path: /api/v1/auth/login
+    auth: none
+    body: {identifier: "username or email", password: string, device_id: optional}
+    responses: [200, 401]
+    notes: "Single message 'Invalid username or password' for every failure shape."
+
+  - method: POST
+    path: /api/v1/auth/refresh
+    auth: none
+    body: {refresh_token: string}
+    responses: [200, 401]
+
+  - method: POST
+    path: /api/v1/auth/logout
+    auth: bearer
+    responses: [204]
+
+  - method: GET
+    path: /api/v1/auth/profile
+    auth: bearer
+    responses: [200, 404]
+    notes: "Always the caller's own row; no uid parameter exists."
+
+  - method: PATCH
+    path: /api/v1/auth/profile
+    auth: bearer
+    body: {display_name: optional, locale: optional}
+    responses: [200, 400, 422]
+    notes: "extra=forbid: status, username, email and nepali_enabled are rejected."
+
+  - method: GET
+    path: /api/v1/auth/username/available
+    auth: none
+    query: {username: string}
+    responses: [200]
+
+  - method: DELETE
+    path: /api/v1/auth/account
+    auth: bearer
+    body: {confirm: true, password: optional, code: optional}
+    responses: [200, 400, 403, 502]
+    notes: "Re-authentication required; events are anonymised, profile and identity deleted."
+
+  - method: GET
+    path: /api/v1/me
+    auth: bearer
+    responses: [200, 401, 503]
+    notes: "Kept for compatibility with the existing client."
+
+  - method: POST
+    path: /api/v1/auth/password/forgot
+    auth: none
+    body: {email: string}
+    responses: [202]
+
+  - method: POST
+    path: /api/v1/auth/password/reset
+    auth: none
+    body: {email: string, code: string, password: string}
+    responses: [200, 400, 502]
+
+removed_from_v1:
+  - "web cookie session + CSRF double-submit (mobile only, A20)"
+  - "Google sign-in (A22): no dependency, no client IDs, no provider config"
+  - "Supabase anon key in the client (A24)"
+  - "Vercel x-vercel-ip-country (A27: Cloudflare CF-IPCountry or local GeoIP)"

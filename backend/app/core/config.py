@@ -115,6 +115,8 @@ class Settings(BaseSettings):
     # Server-side only. Used for admin operations (delete a user, revoke
     # sessions). It must never reach a client; see docs/SECURITY.md.
     supabase_service_role_key: str = ""
+    # Server-side only too: the app never receives it (A24).
+    supabase_anon_key: str = ""
 
     # Auth policy (docs/AUTH-SCHEMA.md). Values are enforced in code and, where
     # they are invariants, in Postgres too.
@@ -127,6 +129,19 @@ class Settings(BaseSettings):
     auth_username_max_length: int = 20
     auth_password_min_length: int = 8
     auth_password_max_length: int = 128
+    # FastAPI owns the code (A25). The pepper is server-only and separate from
+    # the JWT secret so rotating one does not invalidate the other.
+    auth_code_pepper: str = ""
+    auth_signup_token_ttl_seconds: int = 900
+    auth_send_window_seconds: int = 3600
+
+    # Resend is the SMTP side of "Supabase Auth with a custom SMTP provider".
+    resend_api_key: str = ""
+    auth_mail_from: str = ""
+
+    # Only proxies in this list may set X-Forwarded-For / CF-IPCountry.
+    # Comma-separated CIDRs or addresses; empty means "trust nobody".
+    trusted_proxies: str = ""
 
 
 settings = Settings()

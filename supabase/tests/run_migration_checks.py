@@ -79,8 +79,8 @@ def main() -> int:
     root = repo_root()
     migrations = sorted(glob.glob(str(root / "supabase" / "migrations" / "*.sql")))
     rollbacks = sorted(glob.glob(str(root / "supabase" / "rollback" / "*.sql")))
-    if len(migrations) != 4 or len(rollbacks) != 4:
-        print(f"expected 4 migrations and 4 rollbacks, found {len(migrations)} / {len(rollbacks)}")
+    if len(migrations) < 4 or len(rollbacks) != len(migrations):
+        print(f"expected one rollback per migration, found {len(migrations)} / {len(rollbacks)}")
         return 3
 
     head, _ = split_dsn(dsn)
@@ -422,6 +422,36 @@ def main() -> int:
 
         check("deleting auth.users cascades to profiles", c_cascade)
 
+        def c_phase2_objects():
+            """Migration 05 must land the columns the FastAPI store writes to.
+
+            A missing `code_hash` or `sends_in_window` would only surface at
+            runtime, as a 500 on the first registration attempt.
+            """
+            with conn.cursor() as cur:
+                for table, columns in (
+                    ("auth_challenges", {"code_hash", "sends_in_window", "window_started_at"}),
+                    ("profiles", {"nepali_enabled"}),
+                    ("auth_signup_tokens", {"token_hash", "email_hash", "email", "expires_at"}),
+                ):
+                    cur.execute(
+                        "select column_name from information_schema.columns "
+                        "where table_schema='public' and table_name=%s",
+                        (table,),
+                    )
+                    present = {row[0] for row in cur.fetchall()}
+                    missing = columns - present
+                    assert not missing, f"{table} missing {sorted(missing)}"
+                # One challenge per (address, purpose): the upsert key.
+                cur.execute(
+                    "select indexname from pg_indexes where schemaname='public' "
+                    "and tablename='auth_challenges'"
+                )
+                indexes = {row[0] for row in cur.fetchall()}
+                assert "auth_challenges_email_purpose_key" in indexes, sorted(indexes)
+
+        check("migration 05 adds the challenge columns and signup-token table", c_phase2_objects)
+
         # ----------------------------------------------------------- rollback
         def c_rollback():
             for path in reversed(rollbacks):
@@ -438,8 +468,7 @@ def main() -> int:
                 cur.execute("select count(*) from pg_policies where schemaname='public'")
                 assert cur.fetchone()[0] == 0, "policies survived rollback"
 
-        check("four rollbacks remove every table, function and policy", c_rollback)
-
+        check("rollbacks remove every table, function and policy", c_rollback)
     finally:
         conn.close()
         if args.keep:

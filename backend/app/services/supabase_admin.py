@@ -81,3 +81,20 @@ class SupabaseAdmin:
     def user_exists(self, uid: str) -> bool:
         response = self._request("GET", f"/admin/users/{uid}")
         return response.status_code == 200
+
+    def create_user(self, *, email: str, password: str) -> dict:
+        """Create a confirmed identity. Only reached after the code verified."""
+        if not self.configured:
+            raise SupabaseAdminNotConfigured("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
+        import httpx as _httpx
+
+        payload = {"email": email, "password": password, "email_confirm": True}
+        url = f"{self._base_url}/auth/v1/admin/users"
+        if self._client is not None:
+            response = self._client.request("POST", url, headers=self._headers(), json=payload)
+        else:
+            with _httpx.Client(timeout=self._timeout) as client:
+                response = client.request("POST", url, headers=self._headers(), json=payload)
+        if response.status_code >= 400:
+            raise SupabaseAdminError(f"create_user failed with HTTP {response.status_code}")
+        return response.json()

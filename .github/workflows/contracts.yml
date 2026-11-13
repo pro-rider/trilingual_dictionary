@@ -45,3 +45,34 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - name: Test suite (reads the same shared golden vectors)
         run: flutter test
+
+  supabase-migrations:
+    # Runs the schema checks against a throwaway Postgres. The script creates and
+    # drops its own database, stubs auth.users / auth.uid() / the Supabase roles,
+    # applies every migration, runs every check, then rolls everything back.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      AUTH_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install psycopg
+        run: pip install -r backend/requirements.txt
+      - name: Migration checks (up, 21 checks, down)
+        run: python supabase/tests/run_migration_checks.py

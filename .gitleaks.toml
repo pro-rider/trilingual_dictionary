@@ -1,0 +1,26 @@
+# gitleaks configuration — full history, all branches.
+#
+# Run:  gitleaks git --redact -f json -r out.json .
+#
+# One allowlist entry exists, for a synthetic literal inside a test that proves
+# keys are redacted from router stats. It is not a credential: no provider ever
+# accepted it, and it never left the test file. The fingerprint pins one line in
+# one commit, so anything new that looks like a key still fails the scan.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API key"
+regex = '''(?i)(api[_-]?key|apikey|secret|token|password)\s*[:=]\s*["']?([A-Za-z0-9_\-]{16,})["']?'''
+entropy = 3.5
+secretGroup = 2
+keywords = ["api", "key", "secret", "token", "password"]
+
+[[allowlists]]
+description = "Synthetic test literal used to prove keys are redacted in stats"
+commits = ["d41c03728a71283b098827394436ea8c8db4ac92"]
+paths = ['''backend/tests/test_ai_free_failover\.py''']
+regexTarget = "line"
+regexes = ['''sk-live-SECRETSECRET1234''']

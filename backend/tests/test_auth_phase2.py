@@ -370,3 +370,73 @@ def test_delete_logs_no_password_or_token(client, store, auth_client, caplog):
     text = "\n".join(r.getMessage() for r in caplog.records).lower()
     assert auth_client.valid_password.lower() not in text
     assert "bearer " not in text
+
+
+# ------------------------------------------------- logout / reset / availability
+
+
+def test_logout_revokes_the_session_and_returns_204(client, auth_client):
+    calls: list[str] = []
+    auth_client.sign_out = lambda token: calls.append(token)
+    r = client.post("/api/v1/auth/logout", headers=token_for("uid-1"))
+    assert r.status_code == 204
+    assert len(calls) == 1
+
+
+def test_logout_survives_an_upstream_failure(client, auth_client):
+    def boom(_token):
+        raise RuntimeError("supabase down")
+
+    auth_client.sign_out = boom
+    # A dead upstream must not make the client think it is still signed in.
+    assert client.post("/api/v1/auth/logout", headers=token_for("uid-1")).status_code == 204
+
+
+def test_refresh_passes_the_new_pair_through(client, auth_client):
+    r = client.post("/api/v1/auth/refresh", json={"refresh_token": "r1"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["access_token"] == "a2" and body["refresh_token"] == "r2"
+    # A rejected refresh is a dead session, not a 500.
+    assert client.post("/api/v1/auth/refresh", json={}).status_code == 400
+
+
+def test_forgot_password_answers_the_same_for_known_and_unknown_addresses(client, store, mailer):
+    store.create_profile(ProfileRow(user_id="uid-1", email="known@example.com", username="known", status="active"))
+    known = client.post("/api/v1/auth/password/forgot", json={"email": "known@example.com"})
+    unknown = client.post("/api/v1/auth/password/forgot", json={"email": "nobody@example.com"})
+    assert known.status_code == unknown.status_code == 202
+    assert known.json() == unknown.json()
+    kind = {email for email, _ in mailer.sent}
+    assert "known@example.com" in kind and "nobody@example.com" in kind
+
+
+def test_password_reset_needs_a_live_code_and_sets_the_password(client, store, mailer, auth_client):
+    store.create_profile(ProfileRow(user_id="uid-1", email="v@example.com", username="vera", status="active"))
+    calls: list[tuple[str, str]] = []
+    auth_client.set_password = lambda uid, password: calls.append((uid, password))
+
+    client.post("/api/v1/auth/password/forgot", json={"email": "v@example.com"})
+    code = mailer.sent[-1][1]
+
+    wrong = client.post(
+        "/api/v1/auth/password/reset",
+        json={"email": "v@example.com", "code": "000000", "password": "Brand-new-pass-1"},
+    )
+    assert wrong.status_code == 400 and calls == []
+
+    ok = client.post(
+        "/api/v1/auth/password/reset",
+        json={"email": "v@example.com", "code": code, "password": "Brand-new-pass-1"},
+    )
+    assert ok.status_code == 200, ok.text
+    assert calls == [("uid-1", "Brand-new-pass-1")]
+
+
+def test_username_availability_is_case_insensitive(client, store):
+    store.create_profile(ProfileRow(user_id="uid-1", email="a@b.c", username="anna", status="active"))
+    assert client.get("/api/v1/auth/username/available", params={"username": "anna"}).json()["available"] is False
+    assert client.get("/api/v1/auth/username/available", params={"username": "ANNA"}).json()["available"] is False
+    assert client.get("/api/v1/auth/username/available", params={"username": "bruno"}).json()["available"] is True
+    # A name that breaks the shape rule is never "available".
+    assert client.get("/api/v1/auth/username/available", params={"username": "bad name"}).json()["available"] is False

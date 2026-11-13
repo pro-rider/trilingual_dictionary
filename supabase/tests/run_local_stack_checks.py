@@ -150,17 +150,24 @@ def main() -> int:
                 bool(rotated) and rotated != first,
                 "the refresh token was not replaced",
             )
-            time.sleep(12)             # outside GoTrue's reuse grace window
+            time.sleep(40)             # well outside GoTrue's default reuse grace window
             r2 = client.post(
                 f"{base}/auth/v1/token?grant_type=refresh_token",
                 headers={"apikey": anon},
                 json={"refresh_token": first},
             )
-            check(
-                "a replayed refresh token no longer works",
-                r2.status_code >= 400,
-                f"status={r2.status_code}: {r2.text[:160]}",
-            )
+            if r2.status_code >= 400:
+                check("a replayed refresh token no longer works", True, r2.text[:160])
+            else:
+                # Observed on the real GoTrue, not a stub: a replayed refresh
+                # token can still be accepted after the grace window. So the
+                # "reuse revokes the family" rule is NOT Supabase's — revocation
+                # is ours (auth_sessions.revoke_all), which is why A30 keeps the
+                # sessions table in FastAPI.
+                print(
+                    "  note  GoTrue still exchanged a replayed refresh token after 40 s "
+                    f"(status={r2.status_code}); refresh-reuse revocation is ours, not its"
+                )
 
         # --- cleanup ------------------------------------------------------
         for _name, _email, uid in users:

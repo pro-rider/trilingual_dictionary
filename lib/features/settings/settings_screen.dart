@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/normalizer.dart';
+import '../../data/auth_token.dart';
 import 'settings_provider.dart';
 
 /// Settings screen (v1): theme, text size, UI language, default input
@@ -116,7 +117,11 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.login, color: Color(0xFF64748B)),
             title: const Text('Account'),
-            subtitle: const Text('Not open yet — works offline without one'),
+            subtitle: Text(
+              ref.watch(authTokenProvider) != null
+                  ? 'Signed in — devices, password, delete account'
+                  : 'Sign in or create an account (lookup works without one)',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/auth'),
           ),

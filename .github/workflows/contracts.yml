@@ -45,3 +45,80 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - name: Test suite (reads the same shared golden vectors)
         run: flutter test
+
+  supabase-migrations:
+    # Runs the schema checks against a throwaway Postgres. The script creates and
+    # drops its own database, stubs auth.users / auth.uid() / the Supabase roles,
+    # applies every migration, runs every check, then rolls everything back.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      AUTH_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install psycopg
+        run: pip install -r backend/requirements.txt
+      - name: Migration checks (up, every check, down)
+        run: python supabase/tests/run_migration_checks.py
+
+  supabase-local-stack:
+    # The real Supabase stack in Docker: real GoTrue, a real auth schema, real
+    # auth.uid() and JWT-based RLS. This is what "VERIFIED (local Supabase)"
+    # means — a hosted project is still needed for pg_cron and e-mail.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # npm, not supabase/setup-cli: the action resolves "latest" through the
+      # GitHub API from a shared runner IP and dies on "rate limit exceeded".
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install the Supabase CLI
+        run: npm install --global supabase@2
+      - name: CLI version
+        run: supabase --version
+      - name: Start the local stack
+        run: supabase start -x vector,imgproxy,studio,realtime,storage-api,edge-runtime,logflare
+      - name: Apply every migration
+        run: supabase db reset --local
+      - name: Export the local stack's keys
+        run: |
+          set -a
+          supabase status -o env > /tmp/sb.env
+          # shellcheck disable=SC1091
+          source /tmp/sb.env
+          set +a
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+          echo "exported: $API_URL"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the client
+        run: pip install -r backend/requirements.txt
+      - name: Real RLS, real JWT and refresh rotation
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: python supabase/tests/run_local_stack_checks.py
+      - name: Stop the stack
+        if: always()
+        run: supabase stop --no-backup

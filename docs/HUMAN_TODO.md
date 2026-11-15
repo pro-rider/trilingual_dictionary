@@ -94,3 +94,35 @@ backend\.venv\Scripts\python.exe backend\tools\backup_db.py     # backup + check
 ```
 
 `make` targets exist for the same four commands if `make` is installed.
+
+---
+
+## 8. Auth system (branch `auth-system`) — human-only steps
+
+Phase 1 is four **unapplied** migration files under `supabase/migrations/`,
+described in `docs/AUTH-SCHEMA.md`. Nothing below can be done by an agent:
+each step needs an account, a DNS record or a legal judgement.
+
+| # | Step | Blocks | Notes |
+|---|---|---|---|
+| 1 | Create the Supabase project and record the project ref | Phase 1 apply, Phase 2 | Free tier covers launch volumes |
+| 2 | Decide the JWT signing mode: keep the legacy **HS256** secret, or move to asymmetric keys | Phase 2 | `backend/app/core/security.py` assumes HS256 today; with asymmetric keys the backend must verify against the project's JWKS instead |
+| 3 | Apply the four migrations (`supabase db push`, or paste each file in the SQL editor **in filename order**) | Phase 2 | — |
+| 4 | Enable `pg_cron` (Database → Extensions) before step 3 | retention | Without it the migrations still succeed with a notice; the three purge functions then need a FastAPI scheduler |
+| 5 | Add custom SMTP (Resend / Brevo / SendGrid) under Authentication → Emails; set code expiry to 10 minutes | Phase 4 | One template for signup **and** reset — the wording must not reveal whether an address exists |
+| 6 | Publish SPF, DKIM and DMARC for the sending subdomain | launch | Without them codes land in spam and signup looks broken |
+| 7 | Put the **service-role** key and the JWT secret in the FastAPI host's environment (`backend/.env` locally) only | Phase 2 | Never in `lib/`, never in git — `docs/SECURITY.md` states this |
+| 8 | Register the mobile deep-link scheme in Supabase (Authentication → URL configuration) | Phase 4 | No web origin is needed while web is deferred (A20) |
+| 9 | Deferred: choose the web login host (Next.js on Vercel vs the Flutter web build) | later | Superseded by A20 — mobile only for now. The Flutter web target still does not boot today (`dart:io`, `path_provider`, `sqflite`) |
+| 10 | Legal review of the privacy-policy wording for `security_events` (salted IP hashes, 30-day retention) | launch | The promise must match migration 3 exactly |
+| 11 | Penetration test before public launch | launch | Required by the brief |
+| 12 | Publish the **static account-deletion page** and enter its URL in Play Console → Data deletion | launch | Per A21: the page describes the in-app path (`DELETE /auth/account`) and the email fallback; it does not delete anything itself |
+| 13 | Give the staging project URL, anon key, service-role key and signing mode to run `supabase/tests/run_migration_checks.py` against real Supabase | Phase 2 | Without these the staging run stays NOT VERIFIED (A23) |
+| 14 | **Disable public sign-up in Supabase** (Authentication → Providers → Email → "Allow new users to sign up" OFF) | launch | With no anon key in the app (A24) nothing can reach `/auth/v1/signup` anyway, but the switch removes the path entirely if a key ever leaks |
+| 15 | If any APK, internal test build or Play upload ever contained a Supabase URL + anon key, **treat that key as public**: rotate it, then confirm sign-up is off | launch | Removing the code later does not un-ship it. `lib/core/supabase_config.dart` never held a real value and is now deleted; only you know whether an earlier build shipped |
+| 16 | Set `AUTH_CODE_PEPPER` (≥ 16 random chars) in the FastAPI environment | Phase 2 | The flow returns 503 "Auth not configured" without it, rather than hashing a 6-digit code with an empty key |
+| 17 | Set `TRUSTED_PROXIES` to your proxy CIDRs (or leave empty when FastAPI is the only hop) | Phase 3 | Until this matches the real edge, per-IP limits count either the proxy or a spoofable header (`backend/tests/test_net.py` proves the ignore-path) |
+| 18 | Phase 4: store the refresh token in `flutter_secure_storage` | Phase 4 | The token is memory-only today, so the 30-day server session is unusable after an app restart (A30) |
+| 19 | Run `backend\tools\update_disposable_domains.py` on the server, then restart | launch | The generated 10k-domain list is git-ignored because upstream reports licence `NOASSERTION`; the repo ships a 340-domain floor (A31) |
+| 20 | Add `AUTH_DISPOSABLE_ALLOW_DOMAINS` when a real user is wrongly blocked | launch | Domain-level override, no redeploy of the list needed |
+| 21 | Keep PR #2 targeting `auth-system`; do not merge to `main`, do not release from this branch | now | The account screen is still a placeholder until Phase 4; the app has no working login UI |

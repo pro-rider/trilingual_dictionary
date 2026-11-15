@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/supabase_config.dart';
-
-/// Favorites: always stored locally (offline), and synced to Supabase when a
-/// user is signed in and the project is configured. Failures are swallowed so
-/// a network issue never breaks the app.
+/// Favorites live on the device and only on the device.
+///
+/// Cloud sync is out of v1 (A28): there is no server-side favorites table, no
+/// Supabase client and no key in the app. A previous version merged rows from a
+/// Supabase table; that path is gone, so a network failure cannot silently
+/// resurrect entries the user deleted, and uninstalling is the only thing that
+/// loses data.
 final favoritesProvider =
     AsyncNotifierProvider<FavoritesRepository, List<String>>(
         FavoritesRepository.new);
@@ -17,66 +18,28 @@ class FavoritesRepository extends AsyncNotifier<List<String>> {
   @override
   Future<List<String>> build() async {
     final prefs = await SharedPreferences.getInstance();
-    final local = prefs.getStringList(_localKey) ?? <String>[];
-    await _syncFromRemote(local);
-    return local;
-  }
-
-  Future<void> _syncFromRemote(List<String> local) async {
-    final client = _client();
-    if (client == null) return;
-    try {
-      final user = client.auth.currentUser;
-      if (user == null) return;
-      final rows = await client
-          .from(SupabaseConfig.favoritesTable)
-          .select('entry_id');
-      final remote = (rows as List)
-          .map((r) => (r as Map)['entry_id'] as String)
-          .toSet();
-      final merged = {...local, ...remote}.toList()..sort();
-      await _saveLocal(merged);
-      state = AsyncData(merged);
-    } catch (_) {
-      // Remote unavailable → keep local.
-    }
+    return prefs.getStringList(_localKey) ?? <String>[];
   }
 
   Future<void> toggle(String entryId) async {
     final current = List<String>.from(state.value ?? const []);
-    final contains = current.contains(entryId);
-    if (contains) {
-      current.remove(entryId);
-    } else {
+    if (!current.remove(entryId)) {
       current.add(entryId);
     }
     current.sort();
     state = AsyncData(current);
     await _saveLocal(current);
+  }
 
-    final client = _client();
-    final user = client?.auth.currentUser;
-    if (client == null || user == null) return;
-    try {
-      final table = client.from(SupabaseConfig.favoritesTable);
-      if (contains) {
-        await table
-            .delete()
-            .eq('user_id', user.id)
-            .eq('entry_id', entryId);
-      } else {
-        await table.insert({'user_id': user.id, 'entry_id': entryId});
-      }
-    } catch (_) {
-      // Remote sync failed → local copy still holds the change.
-    }
+  /// Used by "Log out and clear local data" — the one place favorites are
+  /// removed on purpose, and only when the user asks for it.
+  Future<void> clear() async {
+    state = const AsyncData(<String>[]);
+    await _saveLocal(const <String>[]);
   }
 
   Future<void> _saveLocal(List<String> value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_localKey, value);
   }
-
-  SupabaseClient? _client() =>
-      SupabaseConfig.isConfigured ? Supabase.instance.client : null;
 }

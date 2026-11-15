@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants.dart';
 import '../../core/normalizer.dart';
 import '../../data/api_client.dart';
+import '../../data/auth_token.dart';
 import '../history/history_provider.dart';
 import 'search_provider.dart';
 
@@ -76,6 +77,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          IconButton(
+            tooltip: 'Account',
+            onPressed: () => context.push('/auth'),
+            icon: Icon(
+              ref.watch(authTokenProvider) != null
+                  ? Icons.person
+                  : Icons.person_outline,
+            ),
+          ),
           IconButton(
             tooltip: 'Favorites',
             onPressed: () => context.push('/favorites'),

@@ -1,0 +1,24 @@
+# gitleaks configuration — full history, all branches.
+#
+#   gitleaks git --redact -f json -r out.json .
+#
+# The allowlist below pins exactly one historical line: commit d41c037, file
+# backend/tests/test_ai_free_failover.py, the literal `sk-live-SECRETSECRET1234`
+# that a test used to prove keys are redacted from router stats. It was never a
+# provider credential, but it looked like one, so it is recorded rather than
+# silently ignored. The literal was changed afterwards to
+# `fixture-not-a-real-key-0000`; the old commit keeps the old string, hence the
+# allowlist.
+#
+# Scope is deliberately narrow: one commit, one file, one exact string. A real
+# key added to that same file later still fails the scan.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "One synthetic test literal that looked like a key (see header)"
+commits = ["d41c03728a71283b098827394436ea8c8db4ac92"]
+paths = ['''^backend/tests/test_ai_free_failover\.py$''']
+regexTarget = "line"
+regexes = ['''sk-live-SECRETSECRET1234''']

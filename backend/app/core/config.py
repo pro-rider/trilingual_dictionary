@@ -112,6 +112,52 @@ class Settings(BaseSettings):
     # issued by Supabase Auth in the /me + favorites + feedback endpoints.
     supabase_url: str = ""
     supabase_jwt_secret: str = ""
+    # Server-side only. Used for admin operations (delete a user, revoke
+    # sessions). It must never reach a client; see docs/SECURITY.md.
+    supabase_service_role_key: str = ""
+    # Server-side only too: the app never receives it (A24).
+    supabase_anon_key: str = ""
+
+    # Auth policy (docs/AUTH-SCHEMA.md). Values are enforced in code and, where
+    # they are invariants, in Postgres too.
+    auth_code_ttl_minutes: int = 10
+    auth_max_code_attempts: int = 5
+    auth_resend_cooldown_seconds: int = 60
+    auth_max_emails_per_hour: int = 5
+    auth_lockout_steps_seconds: str = "60,300,900"
+    auth_username_min_length: int = 3
+    auth_username_max_length: int = 20
+    auth_password_min_length: int = 8
+    auth_password_max_length: int = 128
+    # FastAPI owns the code (A25). The pepper is server-only and separate from
+    # the JWT secret so rotating one does not invalidate the other.
+    auth_code_pepper: str = ""
+    auth_signup_token_ttl_seconds: int = 900
+    auth_send_window_seconds: int = 3600
+    # FastAPI owns sessions (A30): Supabase's free plan gives no per-device
+    # listing and no time-boxing, so both clocks are enforced here.
+    auth_session_idle_days: int = 7
+    auth_session_absolute_days: int = 30
+
+    # Guest vs signed-in AI allowance (option B). Guests are keyed by install
+    # id plus the IP bucket; signed-in users by their user id.
+    ai_guest_daily_cap: int = 30
+    ai_user_daily_cap: int = 200
+    # Rotating an install id must not buy unlimited quota: the whole /64 or
+    # single address also has a ceiling, this many times the guest cap.
+    ai_guest_bucket_multiplier: int = 5
+
+    # Disposable-email domains: a bundled list, plus an explicit allow override
+    # for domains a real user has been wrongly blocked on.
+    auth_disposable_allow_domains: str = ""
+
+    # Resend is the SMTP side of "Supabase Auth with a custom SMTP provider".
+    resend_api_key: str = ""
+    auth_mail_from: str = ""
+
+    # Only proxies in this list may set X-Forwarded-For / CF-IPCountry.
+    # Comma-separated CIDRs or addresses; empty means "trust nobody".
+    trusted_proxies: str = ""
 
 
 settings = Settings()

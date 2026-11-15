@@ -88,7 +88,8 @@ def _post(client, text="company", client_id=None):
 
 def test_one_device_cannot_consume_the_whole_ai_budget(monkeypatch):
     monkeypatch.setattr("app.core.config.settings.ai_enabled", False)
-    monkeypatch.setenv("AI_DAILY_CAP_PER_CLIENT", "2")
+    monkeypatch.setenv("AI_DAILY_CAP_PER_GUEST", "2")
+    monkeypatch.setenv("AI_GUEST_BUCKET_MULTIPLIER", "100")
     monkeypatch.setenv("AI_DAILY_CAP", "1000")
     monkeypatch.setenv("AI_RATE_LIMIT_PER_MIN", "0")
     monkeypatch.setenv("AI_RATE_LIMIT_GLOBAL_PER_MIN", "0")
@@ -128,18 +129,66 @@ def test_global_per_minute_ceiling_is_separate_from_the_client_ceiling(monkeypat
     assert _post(client, client_id="c").status_code == 429
 
 
+def _request(peer: str, headers: dict[str, str] | None = None):
+    from starlette.requests import Request
+
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/analyze/text",
+            "headers": [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()],
+            "client": (peer, 5555),
+        }
+    )
+
+
 def test_anonymous_callers_are_keyed_by_ip_not_by_one_shared_word():
-    class FakeClient:
-        def __init__(self, host):
-            self.host = host
+    keys_a = [key for key, _cap in ai_guard._identity_buckets(_request("10.0.0.1"), None)]
+    keys_b = [key for key, _cap in ai_guard._identity_buckets(_request("10.0.0.2"), None)]
+    assert keys_a != keys_b
+    assert keys_a[0].startswith("guest:10.0.0.1")
 
-    class FakeRequest:
-        def __init__(self, host):
-            self.client = FakeClient(host)
 
-    assert ai_guard._client_key(FakeRequest("10.0.0.1"), None) == "ip:10.0.0.1"
-    assert ai_guard._client_key(FakeRequest("10.0.0.2"), None) == "ip:10.0.0.2"
-    assert ai_guard._client_key(FakeRequest("10.0.0.1"), "device-A") == "dev:device-A"
+def test_ipv6_is_counted_per_64_not_per_address():
+    one = ai_guard._ip_bucket(_request("2001:db8:1:2::1"))
+    two = ai_guard._ip_bucket(_request("2001:db8:1:2::beef"))
+    three = ai_guard._ip_bucket(_request("2001:db8:1:3::1"))
+    assert one == two == "2001:db8:1:2::/64"
+    assert three != one
+
+
+def test_rotating_the_install_id_still_hits_the_network_bucket():
+    """The old flaw: a fresh X-Client-Id bought unlimited quota."""
+    for label in ("a", "b", "c"):
+        keys = [k for k, _c in ai_guard._identity_buckets(_request("203.0.113.7"), label)]
+        assert any(k.startswith("guest-net:") for k in keys)
+    distinct_labels = {
+        ai_guard._identity_buckets(_request("203.0.113.7"), label)[0][0] for label in ("a", "b")
+    }
+    assert len(distinct_labels) == 2                       # label buys its own small bucket
+    net_buckets = {
+        [k for k, _c in ai_guard._identity_buckets(_request("203.0.113.7"), label) if k.startswith("guest-net:")][0]
+        for label in ("a", "b")
+    }
+    assert len(net_buckets) == 1                           # but not its own network bucket
+
+
+def test_a_valid_token_moves_the_caller_to_the_user_budget(monkeypatch):
+    import jwt as pyjwt
+
+    monkeypatch.setattr("app.core.config.settings.supabase_jwt_secret", "unit-secret")
+    token = pyjwt.encode({"sub": "uid-9", "exp": 10_000_000_000}, "unit-secret", algorithm="HS256")
+    keys = [k for k, cap in ai_guard._identity_buckets(
+        _request("203.0.113.7", {"Authorization": f"Bearer {token}"}), "install-1"
+    )]
+    assert keys == ["user:uid-9"]
+
+    # A forged token is just a guest, never a 401 and never a user bucket.
+    keys = [k for k, _cap in ai_guard._identity_buckets(
+        _request("203.0.113.7", {"Authorization": "Bearer not.a.jwt"}), "install-1"
+    )]
+    assert all(k.startswith("guest") for k in keys)
 
 
 def test_limiter_reports_which_budget_was_hit():

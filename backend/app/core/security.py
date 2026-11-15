@@ -36,3 +36,22 @@ def verify_supabase_token(
 
 
 SupabaseUser = Depends(verify_supabase_token)
+
+
+def optional_uid(authorization: str | None) -> str | None:
+    """The caller's uid when the bearer token is valid, else None.
+
+    Used by the AI quota: a signed-in user gets a personal allowance, a guest
+    gets the smaller one. A bad or missing token is simply a guest — it must
+    never turn an otherwise public route into a 401.
+    """
+    if not settings.supabase_jwt_secret or not authorization:
+        return None
+    if not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization[7:].strip()
+    try:
+        payload = jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    return payload.get("sub") or None

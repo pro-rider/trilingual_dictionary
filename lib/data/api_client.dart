@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/api_config.dart';
 import '../core/normalizer.dart';
-import '../core/supabase_config.dart';
+import 'auth_token.dart';
 import 'models/analyzed_text.dart';
 import 'models/dictionary_entry.dart';
 import 'models/word_image.dart';
@@ -19,13 +18,12 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       receiveTimeout: ApiConfig.timeout,
     ),
   );
-  // Attach the Supabase JWT when a user is signed in (for protected endpoints).
+  // Attach the token our own backend issued. There is no Supabase client in
+  // this app: no key ships in the APK (A24), so there is nothing to bypass.
   dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
-    if (SupabaseConfig.isConfigured) {
-      final token = Supabase.instance.client.auth.currentSession?.accessToken;
-      if (token != null) {
-        options.headers['Authorization'] = 'Bearer $token';
-      }
+    final token = ref.read(authTokenProvider);
+    if (token != null && token.isNotEmpty) {
+      options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
   }));

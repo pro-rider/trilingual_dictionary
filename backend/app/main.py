@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +16,8 @@ from app.api.v1.router import api_router
 from app.core import ai_guard, obs
 from app.core.config import settings
 from app.core.exceptions import ApiError
+from app.core.validation import safe_validation_handler
+from app.services.auth_flow import AuthNotConfigured
 
 logger = logging.getLogger("app.main")
 
@@ -90,6 +93,18 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=exc.status_code, content={"detail": exc.message}
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_handler(request: Request, exc: RequestValidationError):
+        """Never echo the submitted value: it can be a password or a code."""
+        return await safe_validation_handler(request, exc)
+
+    @app.exception_handler(AuthNotConfigured)
+    async def auth_not_configured_handler(request: Request, exc: AuthNotConfigured):
+        """A missing pepper is a deployment error, not a 500 with a traceback."""
+        logger.error("auth is not configured: %s", exc)
+        return JSONResponse(status_code=503, content={"detail": "Auth not configured"})
+
 
     @app.get("/")
     def root():

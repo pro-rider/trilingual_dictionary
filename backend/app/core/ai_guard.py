@@ -22,7 +22,9 @@ Nothing here logs user text: only counts, client keys and status codes.
 
 from __future__ import annotations
 
+import hashlib
 import hmac
+import ipaddress
 import logging
 import os
 import time
@@ -30,7 +32,9 @@ from pathlib import Path
 
 from fastapi import Header, HTTPException, Request
 
+from app.core import net
 from app.core.config import settings
+from app.core.security import optional_uid
 
 logger = logging.getLogger(__name__)
 
@@ -151,39 +155,89 @@ class _SlidingWindow:
 limiter = _SlidingWindow()
 
 
-def _client_key(request: Request, x_client_id: str | None) -> str:
-    """Prefer the app's device id, fall back to the caller's IP address.
+def _ip_bucket(request: Request) -> str:
+    """The address (IPv4) or /64 network (IPv6) a caller is counted against.
 
-    Without the fallback every anonymous caller shares the single key
-    ``anonymous`` and one of them can lock the rest out.
+    One attacker usually controls a whole /64, so keying on a single IPv6
+    address would let them rotate through billions of addresses and never hit
+    a per-IP cap. The address itself is already resolved through the trusted
+    proxy rules in `app.core.net`.
     """
-    if x_client_id and x_client_id.strip():
-        return "dev:" + x_client_id.strip()[:64]
-    host = ""
-    if request is not None and request.client is not None:
-        host = request.client.host or ""
-    return "ip:" + (host or "unknown")[:64]
+    raw = net.client_ip(request) if request is not None else ""
+    if not raw:
+        return "unknown"
+    try:
+        address = ipaddress.ip_address(raw)
+    except ValueError:
+        return "unknown"
+    if address.version == 6:
+        return str(ipaddress.ip_network(f"{address}/64", strict=False))
+    return str(address)
+
+
+def _label_hash(label: str | None) -> str:
+    if not label or not label.strip():
+        return ""
+    return hashlib.sha256(label.strip().encode()).hexdigest()[:16]
+
+
+def _identity_buckets(request: Request, label: str | None) -> list[tuple[str, int]]:
+    """(bucket, daily cap) pairs that must all pass.
+
+    Signed-in users are keyed by their uid. Guests are keyed by the install id
+    *and* by the IP bucket, so deleting the install id resets only one counter:
+    rotating a client-supplied header cannot buy unlimited quota (this was the
+    flaw in keying on `X-Client-Id` alone). Neither value is stored or logged.
+    """
+    uid = optional_uid(request.headers.get("authorization") if request is not None else None)
+    if uid:
+        cap = _env_int("AI_DAILY_CAP_PER_USER", settings.ai_user_daily_cap)
+        return [(f"user:{uid}", cap)]
+
+    guest_cap = _env_int("AI_DAILY_CAP_PER_GUEST", settings.ai_guest_daily_cap)
+    bucket = _ip_bucket(request)
+    pairs: list[tuple[str, int]] = []
+    label = _label_hash(label)
+    if label:
+        pairs.append((f"guest:{bucket}:{label}", guest_cap))
+    elif bucket != "unknown":
+        pairs.append((f"guest:{bucket}", guest_cap))
+    if bucket != "unknown":
+        multiplier = _env_int("AI_GUEST_BUCKET_MULTIPLIER", settings.ai_guest_bucket_multiplier)
+        pairs.append((f"guest-net:{bucket}", guest_cap * max(1, multiplier)))
+    return pairs or [("guest:unknown", guest_cap)]
 
 
 def enforce_limits(
     request: Request,
+    x_install_id: str | None = Header(default=None, alias="X-Install-Id"),
     x_client_id: str | None = Header(default=None, alias="X-Client-Id"),
 ) -> None:
-    """Dependency: 429 when a client or the whole process exceeds its quota."""
+    """Dependency: 429 when a caller or the whole process exceeds its quota.
+
+    Option B: guests get a small daily allowance, signed-in users a larger one,
+    and a process-wide ceiling protects the provider budget. The primary key
+    comes from the caller's identity, never from a header alone; `X-Client-Id`
+    is accepted only as a legacy alias for the install id, and the IP bucket
+    caps that alias anyway.
+    """
     per_minute = _env_int("AI_RATE_LIMIT_PER_MIN", settings.ai_rate_limit_per_min)
-    daily_cap = _env_int("AI_DAILY_CAP_PER_CLIENT", settings.ai_daily_cap_per_client)
     global_per_minute = _env_int("AI_RATE_LIMIT_GLOBAL_PER_MIN",
                                  settings.ai_rate_limit_global_per_min)
     global_daily_cap = _env_int("AI_DAILY_CAP", settings.ai_daily_cap)
-    if all(v <= 0 for v in (per_minute, daily_cap, global_per_minute, global_daily_cap)):
+
+    buckets = _identity_buckets(request, x_install_id or x_client_id)
+    if all(cap <= 0 for _key, cap in buckets) and per_minute <= 0 \
+            and global_per_minute <= 0 and global_daily_cap <= 0:
         return
-    key = _client_key(request, x_client_id)
-    allowed, reason = limiter.allow(
-        key, per_minute, daily_cap, global_per_minute, global_daily_cap
-    )
-    if not allowed:
-        logger.info("ai limit hit: scope=%s key=%s", reason, key)
-        raise HTTPException(
-            status_code=429,
-            detail="Usage limit reached. Please try again later.",
+
+    for key, daily_cap in buckets:
+        allowed, reason = limiter.allow(
+            key, per_minute, daily_cap, global_per_minute, global_daily_cap
         )
+        if not allowed:
+            logger.info("ai limit hit: scope=%s key_class=%s", reason, key.split(":")[0])
+            raise HTTPException(
+                status_code=429,
+                detail="Usage limit reached. Please try again later.",
+            )

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants.dart';
+import '../../../app/theme/app_tokens.dart';
 import '../../../core/tts_service.dart';
 
 /// The reusable 3-language display widget.
@@ -36,29 +36,30 @@ class TrilingualBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _row(context, ref, LanguageColors.en, 'English', en,
-            SpeechLang.english),
+        _row(context, ref, tokens.brand, 'English', en, SpeechLang.english,
+            soft: tokens.surface),
         _row(
           context,
           ref,
-          LanguageColors.zh,
+          tokens.zh,
           '中文',
           zh,
           SpeechLang.chinese,
           pinyin: pinyin,
-          soft: LanguageColors.zhSoft,
+          soft: tokens.zhSoft,
         ),
         _row(
           context,
           ref,
-          LanguageColors.ne,
+          tokens.ne,
           'नेपाली',
           ne,
           SpeechLang.nepali,
-          soft: LanguageColors.neSoft,
+          soft: tokens.neSoft,
           emphasized: highlightNepali,
         ),
       ],
@@ -76,7 +77,7 @@ class TrilingualBlock extends ConsumerWidget {
     Color? soft,
     bool emphasized = false,
   }) {
-    final scheme = Theme.of(context).colorScheme;
+    final tokens = context.tokens;
     final hasPinyin = pinyin != null && pinyin.trim().isNotEmpty;
     final body = text.trim();
     final hasBody = body.isNotEmpty;
@@ -85,7 +86,7 @@ class TrilingualBlock extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: soft ?? Colors.white,
+        color: soft ?? tokens.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
@@ -144,7 +145,7 @@ class TrilingualBlock extends ConsumerWidget {
                       fontSize: emphasized ? 15.5 : 14.5,
                       fontWeight:
                           emphasized ? FontWeight.w600 : FontWeight.w500,
-                      color: scheme.onSurface,
+                      color: tokens.textPrimary,
                       height: 1.35,
                     ),
                   )

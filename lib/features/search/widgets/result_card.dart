@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants.dart';
+import '../../../app/theme/app_tokens.dart';
 import '../../../data/models/sense.dart';
 import 'sentence_section.dart';
 import 'trilingual_block.dart';
@@ -19,12 +19,13 @@ class ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final example = sense.reviewedExample;
+    final tokens = context.tokens;
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: BorderSide(color: tokens.border),
       ),
       child: InkWell(
         onTap: onOpen,
@@ -34,7 +35,7 @@ class ResultCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _header(),
+              _header(context),
               const SizedBox(height: 12),
               TrilingualBlock(
                 en: sense.meaningEn,
@@ -55,30 +56,33 @@ class ResultCard extends StatelessWidget {
     );
   }
 
-  Widget _header() {
+  Widget _header(BuildContext context) {
+    final tokens = context.tokens;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
             '${sense.wordEn} · ${sense.wordZh}',
-            style: const TextStyle(
-                fontSize: 19, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                color: tokens.textPrimary),
           ),
         ),
         if (sense.pos.isNotEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: LanguageColors.brandSoft,
+              color: tokens.brandSoft,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               sense.pos,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF0369A1)),
+                  color: tokens.brandInk),
             ),
           ),
       ],

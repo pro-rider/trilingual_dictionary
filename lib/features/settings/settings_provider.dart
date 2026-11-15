@@ -15,7 +15,7 @@ class AppSettings {
   final bool soundEnabled;
 
   const AppSettings({
-    this.themeMode = ThemeMode.light,
+    this.themeMode = ThemeMode.system,
     this.textScale = 1.0,
     this.uiLanguage = AppLanguage.english,
     this.defaultInputLang = InputLanguage.english,
@@ -139,11 +139,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
     return raw.clamp(kMinTextScale, kMaxTextScale).toDouble();
   }
 
-  static ThemeMode _themeByName(String? name) => switch (name) {
-        'dark' => ThemeMode.dark,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.light,
-      };
+  /// Absent/unknown now means "follow the system" (Phase 1 default). A value
+  /// the user already saved keeps winning, so an existing Light/Dark choice
+  /// is never reset by this change.
+  static ThemeMode _themeByName(String? name) => themeModeFromName(name);
 
   static AppLanguage _appLanguageByName(String? name) => switch (name) {
         'chinese' => AppLanguage.chinese,
@@ -154,4 +153,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
 final settingsProvider =
     NotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+
+/// Maps a stored string to a [ThemeMode]. Anything absent or unrecognised
+/// falls back to "follow the system".
+ThemeMode themeModeFromName(String? name) => switch (name) {
+      'dark' => ThemeMode.dark,
+      'light' => ThemeMode.light,
+      _ => ThemeMode.system,
+    };
 

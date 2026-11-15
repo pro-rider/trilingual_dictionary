@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme/app_tokens.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/word_image.dart';
 import '../../../data/providers.dart';
@@ -80,6 +81,7 @@ class WordImageCard extends ConsumerWidget {
   /// The thumbnail shipped in the APK: instant, offline, ≤15 KB.
   Widget _bundledImage(
       BuildContext context, EntryImage image, bool compact) {
+    final tokens = context.tokens;
     final picture = ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: AspectRatio(
@@ -104,8 +106,8 @@ class WordImageCard extends ConsumerWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            const Icon(Icons.photo_camera_outlined,
-                size: 13, color: Color(0xFF94A3B8)),
+            Icon(Icons.photo_camera_outlined,
+                size: 13, color: tokens.textMuted),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -114,7 +116,7 @@ class WordImageCard extends ConsumerWidget {
                     : '${image.attribution} · tap to enlarge',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                style: TextStyle(fontSize: 11, color: tokens.textMuted),
               ),
             ),
           ],
@@ -124,6 +126,7 @@ class WordImageCard extends ConsumerWidget {
   }
 
   void _openLocal(BuildContext context, EntryImage image) {
+    final tokens = context.tokens;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -148,8 +151,7 @@ class WordImageCard extends ConsumerWidget {
                   Text(
                     '${image.license} · ${image.matchMethod} · '
                     'confidence ${image.confidence.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 11, color: tokens.textMuted),
                   ),
                   const SizedBox(height: 8),
                   Align(
@@ -169,6 +171,7 @@ class WordImageCard extends ConsumerWidget {
   }
 
   Widget _networkImage(BuildContext context, WordImage image, bool compact) {
+    final tokens = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -204,15 +207,15 @@ class WordImageCard extends ConsumerWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.photo_camera_outlined,
-                  size: 13, color: Color(0xFF94A3B8)),
+              Icon(Icons.photo_camera_outlined,
+                  size: 13, color: tokens.textMuted),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   _attribution(image),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 11, color: tokens.textMuted),
                 ),
               ),
             ],
@@ -233,6 +236,7 @@ class WordImageCard extends ConsumerWidget {
   }
 
   void _openViewer(BuildContext context, WordImage image) {
+    final tokens = context.tokens;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -265,8 +269,7 @@ class WordImageCard extends ConsumerWidget {
                   Text(
                     '${image.license} · ${image.matchMethod} · '
                     'confidence ${image.confidence.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 11, color: tokens.textMuted),
                   ),
                   const SizedBox(height: 8),
                   Align(
@@ -296,12 +299,13 @@ class WordImageCard extends ConsumerWidget {
   }
 
   Widget _shimmer(BuildContext context) {
+    final tokens = context.tokens;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE2E8F0), Color(0xFFF1F5F9)],
+          colors: [tokens.surfaceMuted, tokens.surface],
         ),
       ),
       child: const Center(
@@ -331,23 +335,24 @@ class WordImageCard extends ConsumerWidget {
   };
 
   Widget _iconFallback(BuildContext context, String category, {bool inline = false}) {
+    final tokens = context.tokens;
     final icon = _categoryIcons[category] ?? Icons.image_outlined;
     final box = Container(
       height: inline ? null : 120,
       width: double.infinity,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: tokens.surfaceMuted,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 34, color: const Color(0xFF94A3B8)),
+          Icon(icon, size: 34, color: tokens.textMuted),
           const SizedBox(height: 6),
           Text(
             'No picture yet · ${category.replaceAll('_', ' ')}',
-            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 11, color: tokens.textMuted),
           ),
         ],
       ),
@@ -358,10 +363,10 @@ class WordImageCard extends ConsumerWidget {
       children: [
         box,
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'No verified picture for this word yet — add freely licensed images '
           'from the curation queue.',
-          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          style: TextStyle(fontSize: 11, color: tokens.textMuted),
         ),
       ],
     );

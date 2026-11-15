@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../core/constants.dart';
 import '../../core/normalizer.dart';
 import '../../data/auth_token.dart';
@@ -22,9 +23,9 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _section('Appearance'),
+          _section(context, 'Appearance'),
           _tile(
-            leading: const Icon(Icons.brightness_6, color: LanguageColors.brand),
+            leading: Icon(Icons.brightness_6, color: context.tokens.brandInk),
             title: 'Theme',
             trailing: DropdownButton<ThemeMode>(
               value: settings.themeMode,
@@ -41,8 +42,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           _tile(
-            leading:
-                const Icon(Icons.format_size, color: LanguageColors.brand),
+            leading: Icon(Icons.format_size, color: context.tokens.brandInk),
             title: 'Text size',
             subtitle: '${settings.textScale.toStringAsFixed(1)}×',
             trailing: SizedBox(
@@ -56,9 +56,9 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          _section('Language'),
+          _section(context, 'Language'),
           _tile(
-            leading: const Icon(Icons.language, color: LanguageColors.brand),
+            leading: Icon(Icons.language, color: context.tokens.brandInk),
             title: 'UI language',
             trailing: DropdownButton<AppLanguage>(
               value: settings.uiLanguage,
@@ -74,8 +74,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           _tile(
-            leading:
-                const Icon(Icons.translate, color: LanguageColors.brand),
+            leading: Icon(Icons.translate, color: context.tokens.brandInk),
             title: 'Default input language',
             trailing: SegmentedButton<InputLanguage>(
               segments: const [
@@ -89,16 +88,16 @@ class SettingsScreen extends ConsumerWidget {
                   notifier.setDefaultInputLang(s.first),
             ),
           ),
-          _section('Behaviour'),
+          _section(context, 'Behaviour'),
           SwitchListTile(
-            secondary: const Icon(Icons.offline_pin, color: LanguageColors.brand),
+            secondary: Icon(Icons.offline_pin, color: context.tokens.brandInk),
             title: const Text('Offline-first search'),
             subtitle: const Text('Use the bundled dictionary before the API'),
             value: settings.offlineFirst,
             onChanged: (_) => notifier.toggleOfflineFirst(),
           ),
           SwitchListTile(
-            secondary: const Icon(Icons.volume_up, color: LanguageColors.ne),
+            secondary: Icon(Icons.volume_up, color: context.tokens.neInk),
             title: const Text('Sound & TTS'),
             subtitle: const Text('Later phase — needs a TTS plugin'),
             value: settings.soundEnabled,
@@ -106,16 +105,16 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           const Divider(),
-          _section('Account & Sync'),
+          _section(context, 'Account & Sync'),
           ListTile(
-            leading: const Icon(Icons.favorite, color: LanguageColors.brand),
+            leading: Icon(Icons.favorite, color: context.tokens.brandInk),
             title: const Text('My favorites'),
             subtitle: const Text('Saved words'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/favorites'),
           ),
           ListTile(
-            leading: const Icon(Icons.login, color: Color(0xFF64748B)),
+            leading: Icon(Icons.login, color: context.tokens.textMuted),
             title: const Text('Account'),
             subtitle: Text(
               ref.watch(authTokenProvider) != null
@@ -127,7 +126,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.record_voice_over, color: Color(0xFF64748B)),
+            leading: Icon(Icons.record_voice_over, color: context.tokens.textMuted),
             title: const Text('TTS diagnosis'),
             subtitle: const Text('Temporary: engine, voices and tap-to-sound latency'),
             trailing: const Icon(Icons.chevron_right),
@@ -135,24 +134,24 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.workspace_premium_outlined,
-                color: Color(0xFF64748B)),
+            leading: Icon(Icons.workspace_premium_outlined,
+                color: context.tokens.textMuted),
             title: const Text('Credits & licences'),
             subtitle: const Text('CC-CEDICT, Chinese Wiktionary, images'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/credits'),
           ),
           ListTile(
-            leading: const Icon(Icons.fact_check_outlined,
-                color: Color(0xFF64748B)),
+            leading: Icon(Icons.fact_check_outlined,
+                color: context.tokens.textMuted),
             title: const Text('About data quality'),
             subtitle: const Text('What "reviewed" and "pending" mean'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/data-quality'),
           ),
           ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined,
-                color: Color(0xFF64748B)),
+            leading: Icon(Icons.privacy_tip_outlined,
+                color: context.tokens.textMuted),
             title: const Text('Privacy policy'),
             subtitle: const Text('What is sent to AI providers, and what is kept'),
             trailing: const Icon(Icons.open_in_new),
@@ -199,12 +198,14 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _section(String title) => Padding(
+  Widget _section(BuildContext context, String title) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
         child: Text(
           title,
-          style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       );
 

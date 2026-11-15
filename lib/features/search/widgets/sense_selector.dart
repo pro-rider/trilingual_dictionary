@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants.dart';
+import '../../../app/theme/app_tokens.dart';
 import '../../../data/models/sense.dart';
 
 /// Lets the user pick which meaning of a word to view (v2 spec).
@@ -19,17 +19,18 @@ class SenseSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (senses.length <= 1) return const SizedBox.shrink();
+    final tokens = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 6),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             'Choose a meaning',
             style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF475569)),
+                color: tokens.textMuted),
           ),
         ),
         SingleChildScrollView(
@@ -47,15 +48,13 @@ class SenseSelector extends StatelessWidget {
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: i == selectedIndex
-                          ? LanguageColors.brand
-                          : const Color(0xFF475569),
+                          ? tokens.brandInk
+                          : tokens.textMuted,
                     ),
-                    selectedColor: LanguageColors.brandSoft,
-                    backgroundColor: Colors.white,
+                    selectedColor: tokens.brandSoft,
+                    backgroundColor: tokens.surface,
                     side: BorderSide(
-                      color: i == selectedIndex
-                          ? LanguageColors.brand
-                          : const Color(0xFFE2E8F0),
+                      color: i == selectedIndex ? tokens.brand : tokens.border,
                     ),
                   ),
                 ),

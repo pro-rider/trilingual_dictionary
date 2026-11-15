@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../core/normalizer.dart';
 import '../../data/models/analyzed_text.dart';
 import '../search/widgets/trilingual_block.dart';
@@ -52,12 +52,13 @@ class AnalyzeScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         child: Text(text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF64748B), fontSize: 15)),
+            style: TextStyle(color: context.tokens.textMuted, fontSize: 15)),
       ),
     );
   }
 
   Widget _body(BuildContext context, AnalyzedText data) {
+    final tokens = context.tokens;
     final idioms = data.idioms;
     final words = data.words.where((s) => s.hasMeaning).toList();
     final unresolved = data.words.where((s) => !s.hasMeaning).toList();
@@ -69,44 +70,53 @@ class AnalyzeScreen extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: tokens.surfaceMuted,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(data.text,
-              style: const TextStyle(
-                  fontSize: 15.5, fontWeight: FontWeight.w600, height: 1.4)),
+              style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                  color: tokens.textPrimary)),
         ),
         if (data.degraded) ...[
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: tokens.warningSoft,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFF59E0B)),
+              border: Border.all(color: tokens.warning),
             ),
             child: Text(
               data.error.isNotEmpty
                   ? data.error
                   : 'Some words could not be resolved offline (AI offline). '
                       'Their meanings are left blank.',
-              style: const TextStyle(fontSize: 12.5, color: Color(0xFF92400E)),
+              style: TextStyle(fontSize: 12.5, color: tokens.warningInk),
             ),
           ),
         ],
 
         if (idioms.isNotEmpty) ...[
           const SizedBox(height: 18),
-          const Text('Idioms & Phrases',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          Text('Idioms & Phrases',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: tokens.textPrimary)),
           const SizedBox(height: 6),
           for (final s in idioms) _IdiomCard(segment: s),
         ],
 
         if (words.isNotEmpty) ...[
           const SizedBox(height: 18),
-          const Text('Words & Meanings',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          Text('Words & Meanings',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: tokens.textPrimary)),
           const SizedBox(height: 6),
           for (final s in words) _WordCard(segment: s),
         ],
@@ -120,9 +130,9 @@ class AnalyzeScreen extends ConsumerWidget {
               for (final s in unresolved)
                 Chip(
                   label: Text('${s.surface} — ?'),
-                  labelStyle: const TextStyle(
-                      fontSize: 12.5, color: Color(0xFF64748B)),
-                  backgroundColor: const Color(0xFFF1F5F9),
+                  labelStyle:
+                      TextStyle(fontSize: 12.5, color: tokens.textMuted),
+                  backgroundColor: tokens.surfaceMuted,
                 ),
             ],
           ),
@@ -130,8 +140,11 @@ class AnalyzeScreen extends ConsumerWidget {
 
         if (data.whole != null && !data.whole!.isEmpty) ...[
           const SizedBox(height: 22),
-          const Text('Whole translation',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          Text('Whole translation',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: tokens.textPrimary)),
           const SizedBox(height: 6),
           _WholeCard(whole: data.whole!),
         ],
@@ -146,13 +159,14 @@ class _IdiomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final tag = segment.isIdiom ? 'Idiom' : 'Phrase';
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFF59E0B)),
+        side: BorderSide(color: tokens.warning),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -162,31 +176,30 @@ class _IdiomCard extends StatelessWidget {
             Row(
               children: [
                 Text(segment.surface,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A))),
+                        color: tokens.textPrimary)),
                 const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B),
+                    color: tokens.neFill,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(tag,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white)),
+                          color: tokens.onNeFill)),
                 ),
               ],
             ),
             if (segment.note.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(segment.note,
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFFB45309))),
+                  style: TextStyle(fontSize: 12, color: tokens.neInk)),
             ],
             const SizedBox(height: 8),
             TrilingualBlock(
@@ -208,6 +221,7 @@ class _WordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     final kindTag = segment.isCompound
         ? 'compound'
         : (segment.source == 'ai' ? 'ai' : null);
@@ -216,7 +230,7 @@ class _WordCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: BorderSide(color: tokens.border),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -226,17 +240,17 @@ class _WordCard extends StatelessWidget {
             Row(
               children: [
                 Text(segment.surface,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A))),
+                        color: tokens.textPrimary)),
                 if (segment.pos.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   Text(segment.pos,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF0369A1))),
+                          color: tokens.brandInk)),
                 ],
                 if (kindTag != null) ...[
                   const SizedBox(width: 8),
@@ -244,14 +258,14 @@ class _WordCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: LanguageColors.brandSoft,
+                      color: tokens.brandSoft,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(kindTag,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF0369A1))),
+                            color: tokens.brandInk)),
                   ),
                 ],
               ],
@@ -276,28 +290,29 @@ class _WholeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
+        color: tokens.successSoft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF16A34A)),
+        border: Border.all(color: tokens.success),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (whole.en.isNotEmpty)
-            _line(const Color(0xFF0EA5E9), 'English', whole.en),
+            _line(context, tokens.brand, 'English', whole.en),
           if (whole.zh.isNotEmpty)
-            _line(const Color(0xFFE11D48), '中文', whole.zh),
+            _line(context, tokens.zh, '中文', whole.zh),
           if (whole.ne.isNotEmpty)
-            _line(const Color(0xFFD97706), 'नेपाली', whole.ne),
+            _line(context, tokens.ne, 'नेपाली', whole.ne),
         ],
       ),
     );
   }
 
-  Widget _line(Color color, String label, String text) {
+  Widget _line(BuildContext context, Color color, String label, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Column(
@@ -305,13 +320,14 @@ class _WholeCard extends StatelessWidget {
         children: [
           Text(label,
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
+                  fontSize: 11, fontWeight: FontWeight.w700, color: color)),
           const SizedBox(height: 2),
           Text(text,
-              style: const TextStyle(
-                  fontSize: 14.5, fontWeight: FontWeight.w500, height: 1.35)),
+              style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
+                  color: context.tokens.textPrimary)),
         ],
       ),
     );

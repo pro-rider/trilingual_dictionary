@@ -117,9 +117,9 @@ None of these is a credential. All are tidiness/privacy items:
 
 | where | what |
 | --- | --- |
-| `docs/RELEASE.json:3,5,8` | `C:\Users\Administrator\Desktop\Dictionery\...` absolute paths |
-| `project_guide.md:109` | device serial `R9ZY40T6LXA` |
-| `translation_agent/docs/REPORT-2026-11-09-tasks-011-015.md:4` | hostname `XXSM-20260403WF` |
+| `docs/RELEASE.json:3,5,8` | absolute paths containing the user profile directory |
+| `project_guide.md:109` | the test phone's serial number |
+| `translation_agent/docs/REPORT-2026-11-09-tasks-011-015.md:4` | the build machine's hostname |
 | `backend/tests/test_auth_account.py:24-25` | display-name fixture `"Surendra"` |
 | `backend/tests/test_auth_phase2b.py:383` | `someone@gmail.com` (obviously fake) |
 | `CONTRIBUTING.md:162`, `project_guide.md:578` | `pro-rider@users.noreply.github.com` (already the noreply form) |
@@ -141,3 +141,27 @@ layout, not a secret.
 Nothing in this repository needs key rotation, because no key ever entered its
 history. If a real key was ever pasted into a file on disk that was copied
 somewhere else, that is outside what this audit can see.
+
+## 7. Scrub applied (2026-11-15)
+
+The machine identifiers listed in §5 were removed before the repository went
+public:
+
+- `docs/RELEASE.json` now records its three paths repository-relative
+  (`backend/data/build/...`), so the release record still checks its own hashes
+  without naming a machine;
+- the phone serial in `project_guide.md` became the model name (SM-M166P), which
+  identifies the hardware, not the handset;
+- the build machine hostname was dropped from the translation-agent report;
+- this document no longer quotes the removed values, because printing them here
+  would defeat the scrub.
+
+Re-run the check with:
+
+```
+git grep -n -I -E "Users\\\\Administrator|XXSM-2026" -- .
+```
+
+It must return nothing. The device serial has no pattern form left to search for —
+the string is gone from every tracked file, which is why the scrub is verified by
+reading the two files rather than by a regex.

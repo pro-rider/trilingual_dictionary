@@ -122,19 +122,22 @@ licence. Two acceptable ways to satisfy it:
   builder and the license; publishing the repo satisfies "designated place"), or
 - expose the packed file itself plus this licence at a public URL.
 
-**Two options, and a recommendation** (this is the one item that needs your
-decision before a store release):
+**Decision taken: option A, the public repository is the designated place.**
 
-| option | what it means | risk |
+| option | what it means | outcome |
 | --- | --- | --- |
-| **A. Make the main repository public** | the whole app source becomes the "designated place" | **Rejected.** It would expose `backend/`, the Supabase schema and the auth code — the licence question must not decide the security posture of the product. |
-| **B. A small dedicated public repo or page** | a repository (or a static page) that contains *only* `strokes.bin.gz`, `strokes.index.json`, `build_stroke_pack.py`, `ARPHICPL.TXT` and a short provenance note; the Credits screen links it | No app source, no backend, no keys. Publishes exactly the data the licence asks to be obtainable. |
+| **A. The main repository is public** | the app source, the builder, `ARPHICPL.TXT` and the packed data are all publicly obtainable; the repository URL is the "designated place" | **Chosen on 2026-11-15.** The repository `github.com/pro-rider/trilingual_dictionary` is public, so a recipient of the APK can obtain the converted data and the licence text, and can rebuild the pack from `tools/build_stroke_pack.py` with the checksums in §1. §2(b) is satisfied directly, with no extra page to maintain. |
+| **B. A separate small public repo or page** | a repository containing only the pack, the builder and `ARPHICPL.TXT`, linked from Credits | Not needed under A. It remains the correct answer *if* the main repository ever goes private again: the stroke data must not become unobtainable just because the application source did. |
 
-**Recommended: B.** It satisfies §2(b) narrowly — recipients can obtain the
-modifications under this licence — while keeping the application, the backend
-schema and the auth work private. The link goes in the Credits sentence next to
-the licence name, and it is the same URL the store listing can point to if asked
-how the data is obtainable.
+The consequence of A is recorded rather than hidden: making the repository public
+also publishes `backend/` and the Supabase schema, an exposure accepted as a
+product decision, not as a licence requirement. Keeping those two questions
+separate is why option B existed; with A chosen, the licence obligation and the
+security posture are independent again — the repository is public for the
+project's own reasons, and it happens to satisfy §2(b) as well.
+
+If the repository is ever made private, switch to option B before the next
+release: §2(b) does not care why the data became unobtainable.
 
 The printed conversion date in this document is not the record of truth: the
 build writes `assets/strokes/build_info.json`, a generated Dart constant feeds the
@@ -214,7 +217,9 @@ Two practical rules follow, and the code follows them:
    interactively" display the notice. Our app does not read Arphic *data* as
    commands, but confirm that §2(c) is not triggered by an app that merely renders
    stroke paths derived from the data.
-9. Does the **option B page** (a public repository containing only the pack, the
-   build script and `ARPHICPL.TXT`, linked from Credits) satisfy "designated
-   place", or must the *pre-conversion* source files (the original per-character
-   JSON) also be published?
+9. With the main repository public (option A), confirm that the repository URL —
+   containing the builder, the packed data and `ARPHICPL.TXT`, but also unrelated
+   application and backend source — satisfies "designated place" for the
+   *pre-conversion* data, or whether the original per-character JSON must also be
+   published. We do not ship that original JSON; it is obtainable from the npm
+   package named in §1 instead.

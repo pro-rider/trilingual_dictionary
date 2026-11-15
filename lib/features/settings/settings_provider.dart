@@ -14,6 +14,9 @@ class AppSettings {
   final bool offlineFirst;
   final bool soundEnabled;
 
+  /// Stroke animation speed multiplier for the character panel (1.0 = default).
+  final double strokeSpeed;
+
   const AppSettings({
     this.themeMode = ThemeMode.system,
     this.textScale = 1.0,
@@ -21,6 +24,7 @@ class AppSettings {
     this.defaultInputLang = InputLanguage.english,
     this.offlineFirst = true,
     this.soundEnabled = false,
+    this.strokeSpeed = 1.0,
   });
 
   AppSettings copyWith({
@@ -30,6 +34,7 @@ class AppSettings {
     InputLanguage? defaultInputLang,
     bool? offlineFirst,
     bool? soundEnabled,
+    double? strokeSpeed,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -38,6 +43,7 @@ class AppSettings {
         defaultInputLang: defaultInputLang ?? this.defaultInputLang,
         offlineFirst: offlineFirst ?? this.offlineFirst,
         soundEnabled: soundEnabled ?? this.soundEnabled,
+        strokeSpeed: strokeSpeed ?? this.strokeSpeed,
       );
 }
 
@@ -49,6 +55,10 @@ abstract final class SettingsKeys {
   static const defaultInputLang = 'settings.defaultInputLang';
   static const offlineFirst = 'settings.offlineFirst';
   static const soundEnabled = 'settings.soundEnabled';
+
+  /// Character panel playback speed. This is the single key the character
+  /// panel adds; Phase 1b will give it a row beside the other settings.
+  static const strokeSpeed = 'settings.strokeSpeed';
 }
 
 /// Allowed text-scale range; mirrors the slider in SettingsScreen.
@@ -87,6 +97,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
                 : InputLanguage.english,
         offlineFirst: prefs.getBool(SettingsKeys.offlineFirst) ?? true,
         soundEnabled: prefs.getBool(SettingsKeys.soundEnabled) ?? false,
+        strokeSpeed: _clampSpeed(prefs.getDouble(SettingsKeys.strokeSpeed)),
       );
     } catch (_) {
       // Preferences unavailable (e.g. platform channel missing): keep defaults.
@@ -110,6 +121,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void toggleSound() =>
       _update(state.copyWith(soundEnabled: !state.soundEnabled));
 
+  void setStrokeSpeed(double value) =>
+      _update(state.copyWith(strokeSpeed: _clampSpeed(value)));
+
   void _update(AppSettings next) {
     _dirty = true;
     state = next;
@@ -128,9 +142,17 @@ class SettingsNotifier extends Notifier<AppSettings> {
       );
       await prefs.setBool(SettingsKeys.offlineFirst, s.offlineFirst);
       await prefs.setBool(SettingsKeys.soundEnabled, s.soundEnabled);
+      await prefs.setDouble(SettingsKeys.strokeSpeed, s.strokeSpeed);
     } catch (_) {
       // Persistence failed: the in-memory value still applies this session.
     }
+  }
+
+  /// Playback speed is bounded by the slider in the character panel.
+  static double _clampSpeed(double? raw) {
+    if (raw == null) return 1.0;
+    if (raw.isNaN || raw.isInfinite) return 1.0;
+    return raw.clamp(0.5, 2.0).toDouble();
   }
 
   static double _clampScale(double? raw) {

@@ -82,3 +82,8 @@ app.*.map.json
 # Generated at deploy time: upstream list reports licence NOASSERTION (/backend/data/disposable_email_blocklist.conf
 /backend/data/disposable_email_blocklist.conf
 /backend/data/DISPOSABLE-LICENSE.txt
+
+# Raw upstream downloads (hanzi-writer-data package + Unihan files, ~102 MB).
+# Reproducible from tools/build_stroke_pack.py and the recorded checksums; never
+# committed, so the public tree stays small and no third-party blob is republished.
+stroke_work/

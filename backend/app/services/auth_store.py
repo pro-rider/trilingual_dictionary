@@ -317,12 +317,18 @@ class PgAuthStore(AuthStore):
     def save_signup_token(self, token_hash: str, email: str, expires_at: float) -> None:
         from datetime import datetime
 
+        # Imported here, not at module level: auth_flow imports this module, so a
+        # top-level import would be circular. The fake store never hit this path,
+        # which is how the NameError survived until a real run (A34).
+        from app.services.auth_flow import email_hash
+
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 "insert into public.auth_signup_tokens (token_hash, email_hash, email, expires_at) "
-                "values (%s, %s, %s) on conflict (token_hash) do nothing",
+                "values (%s, %s, %s, %s) on conflict (token_hash) do nothing",
                 (token_hash, email_hash(email), email, datetime.fromtimestamp(expires_at)),
             )
+
 
     def take_signup_token(self, token_hash: str) -> str | None:
         with self._connect() as conn, conn.cursor() as cur:

@@ -12,12 +12,12 @@ void main() {
 
   setUp(StrokePack.resetForTests);
 
-  test('index and payload agree, and the subset is the top-1000 build',
+  test('index and payload agree, and the subset is the top-3000 build',
       () async {
     final pack = await StrokePack.load();
-    expect(pack.topWords, 1000);
-    expect(pack.characterCount, greaterThan(900),
-        reason: 'top-1000 words need ~975 distinct characters');
+    expect(pack.topWords, 3000);
+    expect(pack.characterCount, greaterThan(1800),
+        reason: 'top-3000 words need ~1921 distinct characters');
     expect(pack.has('我'), isTrue);
     expect(pack.has('學'), isTrue, reason: 'traditional forms must be included');
     expect(pack.has('医'), isTrue);
@@ -31,7 +31,7 @@ void main() {
     ) as Map<String, dynamic>;
     expect(index['payloadSha256'], isA<String>());
     expect(index['licence'], 'ARPHICPL.TXT');
-    expect((index['chars'] as int), greaterThan(900));
+    expect((index['chars'] as int), greaterThan(1800));
   });
 
   test('a known character parses into strokes, medians and metrics', () async {
@@ -48,7 +48,7 @@ void main() {
     // 昰 exists in CC-CEDICT as a variant of 是 but has no stroke data.
     expect(pack.has('昰'), isFalse);
     expect(pack.glyph('昰'), isNull);
-    // A character from outside the top-1000 range.
+    // A character from outside the top-3000 range.
     expect(pack.glyph('龘'), isNull);
   });
 

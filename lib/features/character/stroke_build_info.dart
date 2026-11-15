@@ -5,6 +5,6 @@
 
 const String kStrokePackBuilt = '2026-11-15';
 const String kStrokePackSource = 'hanzi-writer-data@2.0.1';
-const int kStrokePackTopWords = 1000;
-const int kStrokePackChars = 934;
-const String kStrokePackSha256 = '2c5c4fee40013227eabf22c34e710ac823b2ee0e47d0f59ada2bb59fa8036ede';
+const int kStrokePackTopWords = 3000;
+const int kStrokePackChars = 1835;
+const String kStrokePackSha256 = '106ffb42715d83af014d284ae096a3e656fc0411319b3812aadb2c5e32fb2205';

@@ -359,7 +359,7 @@ test surface, so the surface is now sized to the row.
 
 ## 11. Stage 2: what running it on the phone actually showed
 
-Device: SM-M166P (`R9ZY40T6LXA`), Android 16 (API 36), profile build
+Device: SM-M166P (Samsung, Android 16 / API 36), profile build
 `app-profile.apk`, installed with `adb install -r` only. Nothing was uninstalled and
 `pm clear` was never run.
 
@@ -431,7 +431,27 @@ stroke order.
 
 Both are covered by the **top-3000** pack already built in `stroke_work/top3000/`
 (1835 characters, 2024.7 KB gzipped) — so the fix is switching the shipped pack to that
-build, not new data. That is your call, since it doubles the asset size.
+build, not new data.
+
+**Resolved 2026-11-15: the shipped pack is now the top-3000 build.** Rebuilt with
+`python tools/build_stroke_pack.py --top 3000`, which rewrites
+`assets/strokes/*` and the generated `lib/features/character/stroke_build_info.dart`:
+
+| | top-1000 (before) | top-3000 (shipped now) |
+| --- | --- | --- |
+| characters wanted / packed / absent | 975 / 934 / 41 | **1921 / 1835 / 86** |
+| payload raw / gzipped | 2,457,029 B / 1,001,505 B (978.0 KB) | **5,099,681 B / 2,073,302 B (2024.7 KB)** |
+| index | 32,478 B | **61,109 B** |
+| words fully covered | 1101/1140 (96.6%) | **3189/3270 (97.5%)** |
+| partial / none | 36 / 6 | **73 / 8** |
+| disputed characters | 59 | **123** |
+| 光 / 山 present | no | **yes** |
+
+The asset grew by 1.05 MB (978.0 KB → 2024.7 KB gzipped), and the disputed set grew from
+59 to 123 because a wider word set reaches more characters whose count disagrees with
+Unihan. `test/stroke_pack_test.dart` now asserts `topWords == 3000` and
+`characterCount > 1800`; the perf, capture and review-capture tests follow the shipped
+pack rather than a hard-coded band.
 
 ## 12. Decisions I need from you
 
@@ -457,5 +477,24 @@ build, not new data. That is your call, since it doubles the asset size.
 **What was done on the phone is reported in §11 and nothing beyond it**: one profile
 build installed with `adb install -r`, one measurement run, one system setting changed
 and restored. No uninstall, no `pm clear`, no push.
+
+## 13. Decisions applied (2026-11-15)
+
+- **Panel mounted.** `lib/features/detail/detail_screen.dart` now builds
+  `CharacterPanel` under the image card, one tab per character of `wordZh`, seeded
+  from `settings.strokeSpeed` and persisting through `setStrokeSpeed`. Panel is
+  skipped when `wordZh` is blank. `test/detail_screen_stroke_panel_test.dart` guards
+  it in both directions (panel present for 光, absent for a blank-Chinese entry) and
+  the test loads the real pack, so a future un-mounting fails CI rather than being
+  discovered on a phone weeks later.
+- **Top-3000 shipped** (§11.4), which is what makes the mount useful: 光 and 山,
+  the two words the home screen promotes, now have stroke data.
+- **Licence decision reversed to option A** in `docs/LICENSE-ARPHIC.md`, because the
+  repository is being made public: the repository itself is now the designated
+  place under APL §2(b). Option B remains documented as the answer if the repository
+  ever goes private again.
+
+Still open from §12: items 1–5 (stroke-order standard, variant mapping, the 59/123
+`decision` rows).
 
 Ready for second render review.

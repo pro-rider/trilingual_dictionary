@@ -105,7 +105,7 @@ void main() {
         (tester) async {
       final pack = await tester.runAsync(StrokePack.load);
       final glyph = pack!.glyph(char);
-      expect(glyph, isNotNull, reason: '$char must be in the top-1000 pack');
+      expect(glyph, isNotNull, reason: '$char must be in the top-3000 pack');
 
       // Five 160 px frames plus their labels need more room than the default
       // 800 px test surface. The height is deliberately tight so the PNG does

@@ -91,13 +91,13 @@ void main() {
         reason: 'gunzip off the UI isolate must stay in the hundreds of ms, not seconds');
   });
 
-  test('the shipped top-1000 pack loads through the app path', () async {
+  test('the shipped top-3000 pack loads through the app path', () async {
     StrokePack.resetForTests();
     final watch = Stopwatch()..start();
     final pack = await StrokePack.load();
     watch.stop();
     // ignore: avoid_print
-    print('top-1000 pack via StrokePack.load (assets + background isolate): '
+    print('top-3000 pack via StrokePack.load (assets + background isolate): '
         '${watch.elapsedMilliseconds} ms, ${pack.characterCount} chars');
     expect(pack.characterCount, greaterThan(900));
   });

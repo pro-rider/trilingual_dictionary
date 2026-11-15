@@ -1,9 +1,9 @@
 {
   "built": "2026-11-15",
-  "topWords": 1000,
-  "chars": 934,
-  "payloadSha256": "2c5c4fee40013227eabf22c34e710ac823b2ee0e47d0f59ada2bb59fa8036ede",
-  "gzippedBytes": 1001505,
+  "topWords": 3000,
+  "chars": 1835,
+  "payloadSha256": "106ffb42715d83af014d284ae096a3e656fc0411319b3812aadb2c5e32fb2205",
+  "gzippedBytes": 2073302,
   "source": "hanzi-writer-data@2.0.1",
   "sourceSha256": "72baf3d82b114e60d6e40ea05f24d2262a05cd39d544e2f322ba2fceb7beff15",
   "conversion": "per-character JSON (strokes, medians, radStrokes) reduced to the keys s (stroke outlines), m (stroke medians) and r (radical stroke indices), coordinates rounded to 1 decimal, one JSON object per line, concatenated and gzipped. No character was added, changed or invented."

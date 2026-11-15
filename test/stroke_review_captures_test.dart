@@ -1,0 +1,315 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:trilingual_dictionary/features/character/stroke_pack.dart';
+import 'package:trilingual_dictionary/features/character/stroke_painter.dart';
+
+/// Review artefacts rendered by the real engine from the shipped pack:
+///
+///   06_contact_sheet.png        every character in review/stroke_spot_check.csv,
+///                              one cell each, strokes numbered
+///   07_frames_CHAR.png          0 / 25 / 50 / 75 / 100 percent of the animation
+///
+/// These are engine output, not phone screenshots. Stage 2 measures on the
+/// device; nothing here is a device measurement.
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  final outDir = Directory('docs/screenshots/character-panel');
+
+  setUpAll(() async {
+    // flutter_test substitutes the Ahem placeholder font, which draws every
+    // string as a solid box. Registering a system CJK font under the Material
+    // default family makes the labels and stroke numbers legible. This changes
+    // nothing about the shipped app.
+    final fontFile = File(r'C:\Windows\Fonts\simhei.ttf');
+    if (!fontFile.existsSync()) return;
+    final bytes = fontFile.readAsBytesSync();
+    final loader = FontLoader('Roboto')
+      ..addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
+    await loader.load();
+  });
+
+  setUp(StrokePack.resetForTests);
+
+  Future<void> save(WidgetTester tester, GlobalKey key, String name) async {
+    final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final bytes = await tester.runAsync(() async {
+      final image = await boundary.toImage(pixelRatio: 1.0);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return data!;
+    });
+    if (!outDir.existsSync()) outDir.createSync(recursive: true);
+    File('${outDir.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+  }
+
+  testWidgets('contact sheet: numbered strokes for every spot-check character',
+      (tester) async {
+    final csv = File('review/stroke_spot_check.csv');
+    expect(csv.existsSync(), isTrue, reason: 'run tools/build_stroke_pack.py first');
+    final lines = csv.readAsStringSync().trim().split('\n').skip(1);
+    final chars = <String>[
+      for (final line in lines)
+        if (line.trim().isNotEmpty) line.split(',').first.trim(),
+    ];
+    expect(chars.length, greaterThan(150));
+
+    final pack = await tester.runAsync(StrokePack.load);
+    final glyphs = <String, StrokeGlyph>{};
+    final missing = <String>[];
+    for (final char in chars) {
+      final glyph = pack!.glyph(char);
+      if (glyph == null) {
+        missing.add(char);
+      } else {
+        glyphs[char] = glyph;
+      }
+    }
+
+    const cell = 150.0;
+    final columns = 12;
+    final rows = (chars.length + columns - 1) ~/ columns;
+    final key = GlobalKey();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: RepaintBoundary(
+          key: key,
+          child: SizedBox(
+            width: columns * cell,
+            height: rows * cell,
+            child: CustomPaint(
+              painter: _SheetPainter(chars: chars, glyphs: glyphs, cell: cell, columns: columns),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await save(tester, key, '06_contact_sheet');
+
+    // A character in the sheet has to be in the pack, or the sheet would lie.
+    expect(missing, isEmpty,
+        reason: 'spot-check characters without stroke data: ${missing.join(' ')}');
+    expect(glyphs.length, chars.length);
+  });
+
+  for (final char in ['我', '永', '都', '學', '这']) {
+    testWidgets('frame sequence: $char at 0/25/50/75/100 percent',
+        (tester) async {
+      final pack = await tester.runAsync(StrokePack.load);
+      final glyph = pack!.glyph(char);
+      expect(glyph, isNotNull, reason: '$char must be in the top-1000 pack');
+
+      // Five 160 px frames plus their labels need more room than the default
+      // 800 px test surface. The height is deliberately tight so the PNG does
+      // not carry a band of empty white below the row.
+      tester.view.physicalSize = const Size(900, 250);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: RepaintBoundary(
+            key: key,
+            child: Container(
+              color: const Color(0xFFFFFFFF),
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$char — ${glyph!.strokeCount} strokes'
+                    '${pack.isDisputed(char) ? " (disputed: Unihan disagrees, count not shown in the panel)" : ""}',
+                    style: const TextStyle(
+                        fontSize: 16, color: Color(0xFF000000), fontFamily: 'Roboto'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final progress in [0.0, 0.25, 0.5, 0.75, 1.0])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 160,
+                                height: 160,
+                                child: Stack(
+                                  children: [
+                                    CustomPaint(
+                                      size: const Size(160, 160),
+                                      painter: StrokePainter(
+                                        glyph: glyph,
+                                        progress: progress,
+                                        color: const Color(0xFF1A1A1A),
+                                        penColor: const Color(0xFF1668C8),
+                                        guideColor: const Color(0xFFCCCCCC),
+                                      ),
+                                    ),
+                                    CustomPaint(
+                                      size: const Size(160, 160),
+                                      painter: _NumberPainter(glyph: glyph,
+                                          shown: (progress * glyph.strokeCount).ceil()),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text('${(progress * 100).round()}%',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Color(0xFF444444),
+                                      fontFamily: 'Roboto')),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await save(tester, key, '07_frames_$char');
+    });
+  }
+}
+
+/// One grid cell per character: the finished character plus a number at the
+/// start point of every stroke, so order can be checked by eye.
+class _SheetPainter extends CustomPainter {
+  _SheetPainter({
+    required this.chars,
+    required this.glyphs,
+    required this.cell,
+    required this.columns,
+  });
+
+  final List<String> chars;
+  final Map<String, StrokeGlyph> glyphs;
+  final double cell;
+  final int columns;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFFFFFF));
+    final label = TextPainter(textDirection: TextDirection.ltr);
+
+    for (var i = 0; i < chars.length; i++) {
+      final char = chars[i];
+      final origin = Offset((i % columns) * cell, (i ~/ columns) * cell);
+      canvas.drawRect(
+        Rect.fromLTWH(origin.dx, origin.dy, cell, cell),
+        Paint()
+          ..color = const Color(0xFF999999)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.5,
+      );
+
+      final glyph = glyphs[char];
+      if (glyph == null) {
+        label.text = TextSpan(
+          text: '$char —no data',
+          style: const TextStyle(fontSize: 10, color: Color(0xFFAA0000), fontFamily: 'Roboto'),
+        );
+        label.layout();
+        label.paint(canvas, origin + const Offset(6, 6));
+        continue;
+      }
+
+      // Character body.
+      final inner = Rect.fromLTWH(origin.dx + 18, origin.dy + 18, cell - 36, cell - 36);
+      canvas.save();
+      canvas.clipRect(Rect.fromLTWH(origin.dx, origin.dy, cell, cell));
+      canvas.translate(inner.left, inner.top + StrokePack.baseline * (inner.width / StrokePack.emUnits));
+      canvas.scale(inner.width / StrokePack.emUnits, -inner.width / StrokePack.emUnits);
+      final fill = Paint()..color = const Color(0xFF1A1A1A);
+      for (final path in glyph.outlines) {
+        canvas.drawPath(path, fill);
+      }
+      canvas.restore();
+
+      // Stroke numbers at each median's start point.
+      final scale = inner.width / StrokePack.emUnits;
+      for (var s = 0; s < glyph.medians.length; s++) {
+        final metric = glyph.medianMetrics[s];
+        final pos = metric.getTangentForOffset(0)!.position;
+        final at = Offset(
+          inner.left + pos.dx * scale,
+          inner.top + (StrokePack.baseline - pos.dy) * scale,
+        );
+        label.text = TextSpan(
+          text: '${s + 1}',
+          style: const TextStyle(fontSize: 10, color: Color(0xFFCC2200), fontFamily: 'Roboto'),
+        );
+        label.layout();
+        // A white disc keeps the number readable on top of the ink.
+        canvas.drawCircle(
+          at + const Offset(2, -10),
+          7,
+          Paint()..color = const Color(0xE6FFFFFF),
+        );
+        label.paint(canvas, at - const Offset(3, 17));
+      }
+
+      label.text = TextSpan(
+        text: '$char·${glyph.strokeCount}',
+        style: const TextStyle(fontSize: 9, color: Color(0xFF666666), fontFamily: 'Roboto'),
+      );
+      label.layout();
+      label.paint(canvas, origin + Offset(4, cell - 12));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SheetPainter old) => old.chars != chars || old.glyphs != glyphs;
+}
+
+/// Numbers 1..n at the start of each median, dimming the strokes not yet drawn.
+class _NumberPainter extends CustomPainter {
+  _NumberPainter({required this.glyph, required this.shown});
+
+  final StrokeGlyph glyph;
+  final int shown;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.shortestSide / StrokePack.emUnits;
+    final label = TextPainter(textDirection: TextDirection.ltr);
+    for (var i = 0; i < glyph.medianMetrics.length; i++) {
+      final pos = glyph.medianMetrics[i].getTangentForOffset(0)!.position;
+      final at = Offset(pos.dx * scale, StrokePack.baseline * scale - pos.dy * scale);
+      final drawn = i < shown;
+      label.text = TextSpan(
+        text: '${i + 1}',
+        style: TextStyle(
+          fontSize: 13,
+          color: drawn ? const Color(0xFFCC2200) : const Color(0xFFAAAAAA),
+          fontFamily: 'Roboto',
+        ),
+      );
+      label.layout();
+      canvas.drawCircle(
+        at + const Offset(8, -12),
+        9,
+        Paint()..color = const Color(0xF2FFFFFF),
+      );
+      label.paint(canvas, at + const Offset(2, -18));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NumberPainter old) => old.shown != shown || old.glyph != glyph;
+}

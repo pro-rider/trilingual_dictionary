@@ -1,0 +1,13 @@
+concept,status,title,license,license_url,author,source_url,width,height,bytes,seconds,reason
+cat,ok,File:Cat playing with a lizard.jpg,CC BY-SA 4.0,https://creativecommons.org/licenses/by-sa/4.0,Basile Morin,https://commons.wikimedia.org/wiki/File:Cat_playing_with_a_lizard.jpg,5557,3125,198746,3.31,
+water,ok,File:Drop of water on water-resistant textile (100% polyester).jpg,CC BY-SA 4.0,https://creativecommons.org/licenses/by-sa/4.0,Petar Milošević,https://commons.wikimedia.org/wiki/File:Drop_of_water_on_water-resistant_textile_(100%25_polyester).jpg,4666,3048,271667,3.25,
+tree,ok,File:Flame tree mali.jpg,CC BY 2.0,https://creativecommons.org/licenses/by/2.0,"Robin Taylor from Bamako, Mali",https://commons.wikimedia.org/wiki/File:Flame_tree_mali.jpg,3072,2048,225285,2.89,
+mountain,ok,"File:Everest, Himalayas.jpg",CC BY 4.0,https://creativecommons.org/licenses/by/4.0,Vyacheslav Argenberg,"https://commons.wikimedia.org/wiki/File:Everest,_Himalayas.jpg",4032,2688,195828,2.75,
+book,ok,File:13-11-02-olb-by-RalfR-03.jpg,CC BY 3.0,https://creativecommons.org/licenses/by/3.0,Ralf Roletschek,https://commons.wikimedia.org/wiki/File:13-11-02-olb-by-RalfR-03.jpg,4288,2848,246998,2.94,
+chair,ok,File:Grand bassin octogonal Jardin des Tuileries 003.jpg,CC BY-SA 3.0,https://creativecommons.org/licenses/by-sa/3.0,Moonik,https://commons.wikimedia.org/wiki/File:Grand_bassin_octogonal_Jardin_des_Tuileries_003.jpg,4117,2755,198383,3.02,
+hand,ok,File:Ambigram Escher and tessellation background - photomontage with reversible hands.jpg,CC BY-SA 4.0,https://creativecommons.org/licenses/by-sa/4.0,Basile Morin,https://commons.wikimedia.org/wiki/File:Ambigram_Escher_and_tessellation_background_-_photomontage_with_reversible_hands.jpg,5648,5648,263006,2.93,
+car,ok,File:Abandoned car in Marine Park (10852p).jpg,CC BY-SA 4.0,https://creativecommons.org/licenses/by-sa/4.0,Rhododendrites,https://commons.wikimedia.org/wiki/File:Abandoned_car_in_Marine_Park_(10852p).jpg,5133,2383,158264,2.76,
+train,ok,File:CP GE AC4400CW 8608 Morant's Curve.jpg,CC BY-SA 4.0,https://creativecommons.org/licenses/by-sa/4.0,Kabelleger / David Gubler,https://commons.wikimedia.org/wiki/File:CP_GE_AC4400CW_8608_Morant%27s_Curve.jpg,5386,3591,235027,2.64,
+apple,ok,File:Apple II at Musée Bolo.jpg,CC BY-SA 2.0 fr,https://creativecommons.org/licenses/by-sa/2.0/fr/deed.en,Rama & Musée Bolo,https://commons.wikimedia.org/wiki/File:Apple_II_at_Mus%C3%A9e_Bolo.jpg,5616,5616,69499,2.49,
+doctor,search_failed,,,,,,,,,,HTTP Error 429: Too Many Requests
+umbrella,search_failed,,,,,,,,,,HTTP Error 429: Too Many Requests

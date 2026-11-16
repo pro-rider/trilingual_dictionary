@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants.dart';
+import '../../app/theme/app_tokens.dart';
 
 /// Onboarding — 3 slides. Not forced in v1 (splash goes straight home),
 /// but kept as an accessible intro.
@@ -53,11 +53,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           width: 96,
                           height: 96,
                           decoration: BoxDecoration(
-                            color: LanguageColors.brandSoft,
+                            color: context.tokens.brandSoft,
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: Icon(s.icon,
-                              size: 48, color: LanguageColors.brand),
+                              size: 48, color: context.tokens.brandFill),
                         ),
                         const SizedBox(height: 24),
                         Text(s.title,
@@ -67,9 +67,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         const SizedBox(height: 10),
                         Text(s.body,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 14,
-                                color: Color(0xFF475569),
+                                color: context.tokens.textMuted,
                                 height: 1.4)),
                       ],
                     ),
@@ -88,8 +88,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     height: 8,
                     decoration: BoxDecoration(
                       color: i == _index
-                          ? LanguageColors.brand
-                          : const Color(0xFFCBD5E1),
+                          ? context.tokens.brandFill
+                          : context.tokens.border,
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),

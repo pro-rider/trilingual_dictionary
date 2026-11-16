@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../core/constants.dart';
 import '../../core/normalizer.dart';
 import '../../data/api_client.dart';
@@ -112,9 +113,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Search English or 中文 — read it in English, 中文 and नेपाली',
-            style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 14, color: context.tokens.textMuted),
           ),
           const SizedBox(height: 16),
           Row(
@@ -134,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               hintText: _inputLang == InputLanguage.english
                   ? 'Search a word… e.g. light'
                   : '输入中文… 例如 光',
-              prefixIcon: const Icon(Icons.search, color: LanguageColors.brand),
+              prefixIcon: Icon(Icons.search, color: context.tokens.brand),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -154,8 +155,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   IconButton(
                     tooltip: 'Search',
                     onPressed: () => _submit(_controller.text),
-                    icon: const Icon(Icons.arrow_forward,
-                        color: LanguageColors.brand),
+                    icon: Icon(Icons.arrow_forward,
+                        color: context.tokens.brand),
                   ),
                 ],
               ),
@@ -169,14 +170,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _QuickCard(
                 icon: Icons.favorite_border,
                 label: 'Favorites',
-                color: LanguageColors.en,
+                color: context.tokens.brand,
                 onTap: () => context.push('/favorites'),
               ),
               const SizedBox(width: 10),
               _QuickCard(
                 icon: Icons.auto_stories,
                 label: 'Learn',
-                color: LanguageColors.ne,
+                color: context.tokens.ne,
                 onTap: () =>
                     ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Learning — later phase')),
@@ -216,8 +217,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 for (final e in entries)
                   ActionChip(
-                    avatar: const Icon(Icons.tag, size: 16,
-                        color: LanguageColors.brand),
+                    avatar: Icon(Icons.tag, size: 16,
+                        color: context.tokens.brand),
                     label: Text('${e.wordEn} · ${e.wordZh}'),
                     onPressed: () => _submit(e.wordEn),
                   ),
@@ -229,7 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: CircularProgressIndicator(),
                 )),
             error: (e, _) => Text('$e',
-                style: const TextStyle(color: Color(0xFFB45309))),
+                style: TextStyle(color: context.tokens.neInk)),
           ),
           const SizedBox(height: 8),
           _BackendStatus(),
@@ -246,9 +247,10 @@ class _BackendStatus extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(backendReachableProvider);
+    final tokens = context.tokens;
     final (Color, String) tuple = status.value == true
-        ? (const Color(0xFF16A34A), 'Full dictionary on device · AI online')
-        : (const Color(0xFF94A3B8), 'Offline mode · full dictionary on device');
+        ? (tokens.success, 'Full dictionary on device · AI online')
+        : (tokens.textMuted, 'Offline mode · full dictionary on device');
     return Row(
       children: [
         Icon(Icons.circle, size: 10, color: tuple.$1),
@@ -256,7 +258,7 @@ class _BackendStatus extends ConsumerWidget {
         Expanded(
           child: Text(
             'Dataset v${AppConstants.datasetVersion} · ${tuple.$2}',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 12, color: tokens.textMuted),
           ),
         ),
       ],
@@ -271,16 +273,17 @@ class _LangSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return SegmentedButton<InputLanguage>(
-      segments: const [
+      segments: [
         ButtonSegment(
             value: InputLanguage.english,
-            label: Text('English'),
-            icon: Icon(Icons.translate, color: LanguageColors.en)),
+            label: const Text('English'),
+            icon: Icon(Icons.translate, color: tokens.brand)),
         ButtonSegment(
             value: InputLanguage.chinese,
-            label: Text('中文'),
-            icon: Icon(Icons.translate, color: LanguageColors.zh)),
+            label: const Text('中文'),
+            icon: Icon(Icons.translate, color: tokens.zh)),
       ],
       selected: {value},
       onSelectionChanged: (s) => onChanged(s.first),
@@ -305,17 +308,19 @@ class _QuickCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.tokens.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: context.tokens.border),
           ),
           child: Column(
             children: [
               Icon(icon, color: color),
               const SizedBox(height: 6),
               Text(label,
-                  style:
-                      const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.tokens.textPrimary)),
             ],
           ),
         ),

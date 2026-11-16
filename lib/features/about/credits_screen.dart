@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../character/stroke_build_info.dart';
+
 /// In-app licence and data-quality disclosure.
 ///
 /// Play Store policy requires the attribution text for every CC BY-SA source to
@@ -25,6 +27,17 @@ class CreditsScreen extends StatelessWidget {
       'Entry images and their thumbnails, each with its own licence noted in '
           'the entry detail screen.',
       'Per-image licence shown on the image; usually CC BY-SA or public domain',
+    ),
+    (
+      'Make Me a Hanzi / Arphic Technology',
+      'Stroke outlines and stroke order come from Make Me a Hanzi '
+          '(github.com/skishore/makemeahanzi), which extracted them from fonts by '
+          'Arphic Technology Co., Ltd. (1999). The stroke data in this app is a '
+          'format conversion of that data made on '
+          '$kStrokePackBuilt for the top $kStrokePackTopWords words, and is '
+          'available to you under the same licence; the full licence text ships '
+          'in assets/strokes/ARPHICPL.TXT.',
+      'Arphic Public License — Arphic Technology Co., Ltd., 1999',
     ),
   ];
 

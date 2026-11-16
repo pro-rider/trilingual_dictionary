@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../data/dictionary_repository.dart';
 import '../../data/providers.dart';
 import 'favorites_repository.dart';
@@ -53,8 +53,8 @@ class FavoritesScreen extends ConsumerWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    tileColor: const Color(0xFFF0F9FF),
-                    leading: const Icon(Icons.star, color: LanguageColors.brand),
+                    tileColor: context.tokens.brandSoft,
+                    leading: Icon(Icons.star, color: context.tokens.brandFill),
                     title: Text(e.en),
                     subtitle: Text(e.zh),
                     trailing: const Icon(Icons.chevron_right),

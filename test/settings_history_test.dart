@@ -80,7 +80,9 @@ void main() {
 
       final s = c.read(settingsProvider);
       expect(s.textScale, kMaxTextScale);
-      expect(s.themeMode, ThemeMode.light);
+      // Phase 1 changed the fallback from Light to "follow the system", so a
+      // corrupt/absent value no longer pins anyone to a light screen.
+      expect(s.themeMode, ThemeMode.system);
       expect(s.uiLanguage, AppLanguage.english);
     });
   });

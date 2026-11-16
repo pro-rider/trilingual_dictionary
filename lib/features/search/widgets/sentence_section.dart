@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_tokens.dart';
 import '../../../data/models/example_sentence.dart';
 import 'trilingual_block.dart';
 
@@ -14,24 +15,25 @@ class SentenceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F9FF),
+        color: tokens.brandSoft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBAE6FD)),
+        border: Border.all(color: tokens.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Example sentence',
                 style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0369A1)),
+                    color: tokens.brandInk),
               ),
               const Spacer(),
               Text(
@@ -44,9 +46,8 @@ class SentenceSection extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: switch (example.reviewStatus) {
-                    'approved' => const Color(0xFF166534),
-                    'ai_generated' => const Color(0xFFB45309),
-                    _ => const Color(0xFFB45309),
+                    'approved' => tokens.successInk,
+                    _ => tokens.neInk,
                   },
                 ),
               ),

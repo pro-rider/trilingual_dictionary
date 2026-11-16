@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../data/auth_api.dart';
 import '../../data/auth_token.dart';
 
@@ -135,7 +135,7 @@ class _SignedOutBodyState extends ConsumerState<_SignedOutBody> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.account_circle, size: 56, color: LanguageColors.brand),
+        Icon(Icons.account_circle, size: 56, color: context.tokens.brandFill),
         const SizedBox(height: 8),
         Text(
           switch (_step) {
@@ -246,7 +246,7 @@ class _SignedOutBodyState extends ConsumerState<_SignedOutBody> {
               border: const OutlineInputBorder(),
               helperText: _usernameNote,
               suffixIcon: _usernameFree
-                  ? const Icon(Icons.check, color: LanguageColors.brand)
+                  ? Icon(Icons.check, color: context.tokens.brandFill)
                   : null,
             ),
           ),
@@ -586,7 +586,7 @@ class _AccountBodyState extends ConsumerState<_AccountBody> {
         const SizedBox(height: 8),
         TextButton(
           onPressed: widget.busy ? null : _deleteAccount,
-          style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+          style: TextButton.styleFrom(foregroundColor: context.tokens.zh),
           child: const Text('Delete account'),
         ),
         const SizedBox(height: 8),
@@ -661,7 +661,7 @@ class _AccountBodyState extends ConsumerState<_AccountBody> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            style: FilledButton.styleFrom(backgroundColor: context.tokens.zh),
             child: const Text('Delete'),
           ),
         ],
@@ -698,7 +698,8 @@ class _Message extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = tone == _Tone.error ? Colors.red.shade700 : LanguageColors.brand;
+    final color =
+        tone == _Tone.error ? context.tokens.zh : context.tokens.brandFill;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

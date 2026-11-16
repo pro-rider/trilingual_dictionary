@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/tts_service.dart';
 import '../../data/providers.dart';
+import '../character/character_panel.dart';
 import '../search/widgets/result_card.dart';
 import '../search/widgets/sense_selector.dart';
 import '../search/widgets/word_image_card.dart';
+import '../settings/settings_provider.dart';
 
 /// Full detail for an entry — all senses stacked.
 class DetailScreen extends ConsumerStatefulWidget {
@@ -23,6 +25,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(dictionaryRepositoryProvider);
+    final settings = ref.watch(settingsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Word detail')),
       body: FutureBuilder(
@@ -84,6 +87,15 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                   ResultCard(sense: senses[i]),
               const SizedBox(height: 14),
               WordImageCard(entryId: entry.entryId, wordZh: entry.wordZh),
+              if (entry.wordZh.trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                CharacterPanel(
+                  characters: entry.wordZh.characters.toList(),
+                  speed: settings.strokeSpeed,
+                  onSpeedChanged:
+                      ref.read(settingsProvider.notifier).setStrokeSpeed,
+                ),
+              ],
             ],
           );
         },

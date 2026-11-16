@@ -106,7 +106,7 @@ failure. `degraded=true` now means a genuinely translatable unit is missing.
 | `POST /api/v1/dictionary/enrich` | `200`, Nepali + one trilingual sentence per sense (20 senses/call) |
 | English lookup (backend) | `water→水`, `book→书`, `apple→苹果`, `fire→火`, `behaviors→行为`, `Nepal→尼泊尔`, `China→中国` |
 | Dictionary self-check | `tools/audit_roundtrip.py`: 2,273 HSK5 queries, 1,584 exact (69.7%) |
-| On the phone (`R9ZY40T6LXA`) | `Nepal` → नेपाली "हिमालयको देश" + 3-language sentence; `China` → 中国 + sentence; `teacher` → 老师 / शिक्षक + reviewed sentence |
+| On the phone (SM-M166P, Android 16) | `Nepal` → नेपाली "हिमालयको देश" + 3-language sentence; `China` → 中国 + sentence; `teacher` → 老师 / शिक्षक + reviewed sentence |
 | Bundled asset | `assets/data/dictionary.sqlite.gz` 43.3 MB = 123,672 entries; APK 248.4 MB |
 | Git | `main` in sync with `origin/main` |
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window background behind the Flutter first frame, light mode.
+         Mirrors AppTokens.light.page so the launch does not flash white-on-dark
+         or dark-on-light. -->
+    <color name="launch_background">#F7FBFF</color>
+</resources>

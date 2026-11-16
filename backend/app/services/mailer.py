@@ -72,5 +72,45 @@ class RecordingMailer:
         return None
 
 
+class FileSinkMailer:
+    """Local development sink: one file per code, in a directory you chose.
+
+    This exists so the whole signup/login flow can be exercised on a real phone
+    before a sender domain is verified. It is not a log: the code goes into a
+    file created 0600 (owner only), one message per file, and nothing is printed.
+    ``get_mailer`` refuses it whenever ``AUTH_ENV`` is ``production``.
+    """
+
+    def __init__(self, directory: str):
+        from pathlib import Path
+
+        self._dir = Path(directory).expanduser()
+
+    def send_code(self, to: str, code: str) -> None:
+        import os
+        import time
+
+        self._dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        name = f"{stamp}-{time.time_ns() % 1_000_000:06d}.txt"
+        path = self._dir / name
+        body = (
+            f"to: {to}\n"
+            f"code: {code}\n"
+            f"sent: {stamp}\n"
+            "note: dev sink (AUTH_MAIL_SINK_DIR). Not an email.\n"
+        )
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(body)
+
+
 def get_mailer() -> Mailer:
+    sink_dir = settings.auth_mail_sink_dir.strip()
+    if sink_dir:
+        if settings.auth_env.strip().lower() == "production":
+            raise MailerNotConfigured(
+                "AUTH_MAIL_SINK_DIR is a development sink; refused when AUTH_ENV=production"
+            )
+        return FileSinkMailer(sink_dir)
     return ResendMailer()

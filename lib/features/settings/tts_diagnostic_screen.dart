@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../app/theme/app_tokens.dart';
+
 /// Temporary TTS diagnostic screen (prompt V1). Shows the engine, the installed
 /// engines, the available languages/voices, and measures tap→sound latency for
 /// English / 中文 / नेपाली on first tap and on five repeat taps.
@@ -368,11 +370,11 @@ class _TtsDiagnosticScreenState extends State<TtsDiagnosticScreen> {
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               'Temporary screen. Reads engine state only; does not change playback.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 12, color: context.tokens.textMuted),
             ),
           ),
           const Divider(height: 24),

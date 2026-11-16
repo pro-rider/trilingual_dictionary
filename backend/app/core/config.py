@@ -154,6 +154,12 @@ class Settings(BaseSettings):
     # Resend is the SMTP side of "Supabase Auth with a custom SMTP provider".
     resend_api_key: str = ""
     auth_mail_from: str = ""
+    # Local development only: when this directory is set, codes are written to
+    # files there instead of being emailed, so the flow can be exercised on a
+    # phone without a sender domain. The mailer refuses it when auth_env is
+    # "production"; the file is created 0600 and never written to a log.
+    auth_mail_sink_dir: str = ""
+    auth_env: str = "development"
 
     # Only proxies in this list may set X-Forwarded-For / CF-IPCountry.
     # Comma-separated CIDRs or addresses; empty means "trust nobody".

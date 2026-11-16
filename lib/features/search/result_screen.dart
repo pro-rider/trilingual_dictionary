@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../core/normalizer.dart';
 import '../../core/tts_service.dart';
 import '../../data/api_client.dart';
@@ -127,6 +128,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     final sense = senses[_senseIndex];
     final favorites = ref.watch(favoritesProvider).value ?? const [];
     final isFav = favorites.contains(entry.entryId);
+    final tokens = context.tokens;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -147,7 +149,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                   ref.read(favoritesProvider.notifier).toggle(entry.entryId),
               icon: Icon(
                 isFav ? Icons.star : Icons.star_border,
-                color: isFav ? const Color(0xFFEAB308) : null,
+                color: isFav ? tokens.ne : null,
               ),
             ),
             TextButton.icon(
@@ -181,16 +183,17 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   /// Honest label for an online AI answer: this word is not in the dictionary,
   /// so the meaning is machine-generated and must not read as verified data.
   Widget _aiBanner(bool cached) {
+    final tokens = context.tokens;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        color: tokens.warningSoft,
+        border: Border.all(color: tokens.warning),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, size: 18, color: Color(0xFFD97706)),
+          Icon(Icons.auto_awesome, size: 18, color: tokens.ne),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -198,7 +201,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               '${cached ? ' · cached' : ''}\n'
               'This word is not in the dictionary yet. The meaning and example '
               'come from an AI model — check them before relying on them.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+              style: TextStyle(fontSize: 12, color: tokens.warningInk),
             ),
           ),
         ],
@@ -207,6 +210,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   }
 
   Widget _empty() {
+    final tokens = context.tokens;
     final reachable = ref.watch(backendReachableProvider);
     final args = SearchArgs(widget.query, widget.lang);
     final online = reachable.valueOrNull;
@@ -227,7 +231,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(online == false ? Icons.wifi_off : Icons.search_off,
-                size: 56, color: const Color(0xFF94A3B8)),
+                size: 56, color: tokens.textMuted),
             const SizedBox(height: 12),
             const Text('No entry found',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -235,7 +239,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF64748B)),
+              style: TextStyle(color: tokens.textMuted),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -259,19 +263,19 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   }
 
   Widget _error(String message) {
+    final tokens = context.tokens;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline,
-                size: 56, color: Color(0xFFE11D48)),
+            Icon(Icons.error_outline, size: 56, color: tokens.zh),
             const SizedBox(height: 12),
             const Text('Something went wrong',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            Text(message, style: const TextStyle(color: Color(0xFF64748B))),
+            Text(message, style: TextStyle(color: tokens.textMuted)),
           ],
         ),
       ),

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants.dart';
+import '../../app/theme/app_tokens.dart';
 
 /// Boot screen → routes to /home after a short splash.
 class SplashScreen extends StatefulWidget {
@@ -32,13 +32,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFE0F2FE), Color(0xFFF7FBFF)],
+            colors: [tokens.brandSoft, tokens.page],
           ),
         ),
         child: Center(
@@ -49,31 +50,34 @@ class _SplashScreenState extends State<SplashScreen> {
                 width: 96,
                 height: 96,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: tokens.surface,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                  border: Border.all(color: tokens.border),
                 ),
-                child: const Icon(Icons.translate,
-                    size: 52, color: LanguageColors.brand),
+                child: Icon(Icons.translate,
+                    size: 52, color: tokens.brandFill),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Trilingual Dictionary',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: tokens.textPrimary),
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text('English', style: TextStyle(color: LanguageColors.en)),
-                  SizedBox(width: 8),
-                  Text('·', style: TextStyle(color: Color(0xFF94A3B8))),
-                  SizedBox(width: 8),
-                  Text('中文', style: TextStyle(color: LanguageColors.zh)),
-                  SizedBox(width: 8),
-                  Text('·', style: TextStyle(color: Color(0xFF94A3B8))),
-                  SizedBox(width: 8),
-                  Text('नेपाली', style: TextStyle(color: LanguageColors.ne)),
+                children: [
+                  Text('English', style: TextStyle(color: tokens.brand)),
+                  const SizedBox(width: 8),
+                  Text('·', style: TextStyle(color: tokens.textMuted)),
+                  const SizedBox(width: 8),
+                  Text('中文', style: TextStyle(color: tokens.zh)),
+                  const SizedBox(width: 8),
+                  Text('·', style: TextStyle(color: tokens.textMuted)),
+                  const SizedBox(width: 8),
+                  Text('नेपाली', style: TextStyle(color: tokens.ne)),
                 ],
               ),
               const SizedBox(height: 24),

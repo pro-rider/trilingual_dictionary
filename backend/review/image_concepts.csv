@@ -1,0 +1,69 @@
+concept,entries_covered,share_of_top_n_pct,keywords,zh_seed,sample_words,best_rank
+head,7,0.23,head,头,说中 部长 头 页 家长 首 院长,658
+house,6,0.2,house|home,房子,家 回家 家里 房子 房屋 在家,262
+watch,6,0.2,watch,表,观察 表 表 一更 三更 观看,1714
+hand,5,0.17,hand,手,手 地和 交 托 交给,721
+school,5,0.17,school,学校,中学 同学 小学 年度 作业,1379
+office,5,0.17,office,办公室,办公室 担任 会所 局 职,1177
+child,5,0.17,child,孩子,孩子 儿童 小的 小孩 儿,295
+write,5,0.17,write,写,写 创作 著作 记载 写作,293
+money,4,0.13,money,钱,值得 金额 赚钱 来钱,1268
+noodle,3,0.1,noodle,面,面 面 面,1087
+mouth,3,0.1,mouth,嘴,口 嘴 含,1694
+hair,3,0.1,hair,发,发 发 头发,359
+tree,3,0.1,tree,树,干 榦 树,362
+lamp,3,0.1,lamp|light,灯,光 轻 轻松,1503
+run,3,0.1,run,跑,跑 经营 遇到,796
+read,3,0.1,read,读,阅读 读 读,872
+eat,3,0.1,eat,吃,吃 吃 内用,250
+laugh,3,0.1,laugh|smile,笑,听 笑 笑,221
+chicken,2,0.07,chicken|hen|rooster,鸡,鸡 鸡,2636
+bear,2,0.07,bear,熊,负责 负,521
+wine,2,0.07,wine,酒,酒店 酒,1856
+eye,2,0.07,eye,眼,中看 眼睛,1264
+foot,2,0.07,foot|feet,脚,脚 脚,1926
+leg,2,0.07,leg,腿,腿 腿,2520
+heart,2,0.07,heart,心,中心 心,246
+grass,2,0.07,grass,草,草 草,2423
+river,2,0.07,river,河,派 河,689
+moon,2,0.07,moon,月,月 日月,31
+star,2,0.07,star,星,明星 星,2336
+table,2,0.07,table,桌子,台 几,514
+ship,2,0.07,ship,船,船 船,2257
+doctor,2,0.07,doctor|physician,医生,医生 博士,1211
+student,2,0.07,student|pupil,学生,学生 大学生,203
+police,2,0.07,police|policeman,警察,警察 警方,641
+walk,2,0.07,walk,走,走 行,245
+stand,2,0.07,stand,站,起来 站,200
+fly,2,0.07,fly,飞,飞 飞行,1892
+bird,1,0.03,bird,鸟,鸟,2582
+pig,1,0.03,pig|hog,猪,猪,2295
+elephant,1,0.03,elephant,象,象,2081
+rice,1,0.03,rice,米,饭,2634
+water,1,0.03,water,水,和,6
+meat,1,0.03,meat|beef|pork,肉,肉,2123
+fruit,1,0.03,fruit,水果,结果,233
+coffee,1,0.03,coffee,咖啡,咖啡,2808
+finger,1,0.03,finger,指,指,611
+blood,1,0.03,blood,血,血,2301
+sea,1,0.03,sea|ocean,海,海洋,2466
+wind,1,0.03,wind,风,风,1641
+cloud,1,0.03,cloud,云,云,1380
+fire,1,0.03,fire|flame,火,克,1566
+shop,1,0.03,shop|store,商店,保存,2693
+station,1,0.03,station,车站,电视台,1440
+library,1,0.03,library,图书馆,图书馆,2809
+park,1,0.03,park,公园,公园,1351
+room,1,0.03,room,房间,房间,2453
+bed,1,0.03,bed,床,睡觉,2379
+train,1,0.03,train,火车,训练,1059
+paper,1,0.03,paper,纸,令,1015
+phone,1,0.03,phone|telephone,电话,打电话,2711
+card,1,0.03,card,卡,卡,1387
+teacher,1,0.03,teacher,老师,脩,2887
+farmer,1,0.03,farmer,农民,农民,906
+drink,1,0.03,drink,喝,喝,1388
+sleep,1,0.03,sleep,睡,睡,1550
+jump,1,0.03,jump,跳,跳,2008
+drive,1,0.03,drive,开车,驾驶,2962
+cry,1,0.03,cry|weep,哭,哭,1980

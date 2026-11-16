@@ -1,5 +1,69 @@
 {
  "models": {
+  "inclusionai/ling-3.2-flash:free": {
+   "id": "inclusionai/ling-3.2-flash:free",
+   "canonical_slug": "inclusionai/ling-3.2-flash-20261113",
+   "hugging_face_id": "inclusionAI/Ling-3.2-flash",
+   "name": "inclusionAI: Ling 3.2 Flash (free)",
+   "created": 1794591958,
+   "description": "Ling 3.2 Flash is a hybrid reasoning model from inclusionAI that accepts text and image input, with a 1M-token context window and up to 200 images per request. Thinking can...",
+   "context_length": 1048576,
+   "architecture": {
+    "modality": "text+image->text",
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "tokenizer": "Other",
+    "instruct_type": null
+   },
+   "pricing": {
+    "prompt": "0",
+    "completion": "0"
+   },
+   "top_provider": {
+    "context_length": 1048576,
+    "max_completion_tokens": 262144,
+    "is_moderated": false
+   },
+   "per_request_limits": null,
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "max_tokens",
+    "presence_penalty",
+    "reasoning",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_p"
+   ],
+   "default_parameters": {},
+   "supported_voices": null,
+   "knowledge_cutoff": null,
+   "expiration_date": null,
+   "links": {
+    "details": "/api/v1/models/inclusionai/ling-3.2-flash-20261113/endpoints"
+   },
+   "endpoints": [
+    "/api/v1/chat/completions",
+    "/api/v1/completions",
+    "/api/v1/messages",
+    "/api/v1/responses"
+   ],
+   "reasoning": {
+    "mandatory": false,
+    "default_enabled": true
+   }
+  },
   "baidu/ernie-5.5-flash-preview:free": {
    "id": "baidu/ernie-5.5-flash-preview:free",
    "canonical_slug": "baidu/ernie-5.5-flash-preview-20261110",
@@ -66,10 +130,10 @@
   "thinkingmachines/inkling-2-small:free": {
    "id": "thinkingmachines/inkling-2-small:free",
    "canonical_slug": "thinkingmachines/inkling-2-small-20261107",
-   "hugging_face_id": null,
+   "hugging_face_id": "thinkingmachines/Inkling-2-Small",
    "name": "Thinking Machines: Inkling 2 Small (free)",
    "created": 1794261847,
-   "description": "Inkling 2 Small is a multimodal mixture-of-experts reasoning model from Thinking Machines Lab, with 17B active parameters out of 594B total. It is the first model in the second Inkling...",
+   "description": "Inkling 2 Small is an open-weight multimodal mixture-of-experts reasoning model from Thinking Machines Lab, with 17B active parameters out of 594B total. It is the first model in the second...",
    "context_length": 1048576,
    "architecture": {
     "modality": "text+image->text",
@@ -216,6 +280,85 @@
     "mandatory": true
    }
   },
+  "particle-ai/particle-1:free": {
+   "id": "particle-ai/particle-1:free",
+   "canonical_slug": "particle-ai/particle-1-20261027",
+   "hugging_face_id": null,
+   "name": "Particle AI: Particle-1 (free)",
+   "created": 1793207893,
+   "description": "Particle-1 is a token-efficient agentic coding model from Particle AI, post-trained on DeepSeek V4.1 Flash. It is suited for software engineering work such as terminal workflows, codebase changes, and data...",
+   "context_length": 1048576,
+   "architecture": {
+    "modality": "text+image->text",
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "tokenizer": "Other",
+    "instruct_type": null
+   },
+   "pricing": {
+    "prompt": "0",
+    "completion": "0"
+   },
+   "top_provider": {
+    "context_length": 1048576,
+    "max_completion_tokens": 131072,
+    "is_moderated": false
+   },
+   "per_request_limits": null,
+   "supported_parameters": [
+    "frequency_penalty",
+    "include_reasoning",
+    "logprobs",
+    "max_tokens",
+    "min_p",
+    "presence_penalty",
+    "reasoning",
+    "reasoning_effort",
+    "repetition_penalty",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_k",
+    "top_logprobs",
+    "top_p"
+   ],
+   "default_parameters": {},
+   "supported_voices": null,
+   "knowledge_cutoff": null,
+   "expiration_date": null,
+   "links": {
+    "details": "/api/v1/models/particle-ai/particle-1-20261027/endpoints"
+   },
+   "endpoints": [
+    "/api/v1/chat/completions",
+    "/api/v1/completions",
+    "/api/v1/messages",
+    "/api/v1/responses"
+   ],
+   "reasoning": {
+    "mandatory": false,
+    "default_enabled": true,
+    "supported_efforts": [
+     "max",
+     "xhigh",
+     "high",
+     "medium",
+     "low",
+     "minimal",
+     "none"
+    ],
+    "default_effort": "high"
+   }
+  },
   "recursive/flint-v1.0:free": {
    "id": "recursive/flint-v1.0:free",
    "canonical_slug": "recursive/flint-v1.0-20261021",
@@ -336,44 +479,44 @@
      {
       "arena": "models",
       "category": "3d",
-      "elo": 1117,
-      "win_rate": 30.4,
-      "rank": 85
+      "elo": 1120,
+      "win_rate": 30.6,
+      "rank": 82
      },
      {
       "arena": "models",
       "category": "codecategories",
-      "elo": 1151,
-      "win_rate": 33.5,
-      "rank": 88
+      "elo": 1140,
+      "win_rate": 32.5,
+      "rank": 94
      },
      {
       "arena": "models",
       "category": "dataviz",
-      "elo": 1099,
-      "win_rate": 27.4,
-      "rank": 101
+      "elo": 1084,
+      "win_rate": 26.1,
+      "rank": 107
      },
      {
       "arena": "models",
       "category": "gamedev",
-      "elo": 1104,
-      "win_rate": 29.5,
-      "rank": 98
+      "elo": 1081,
+      "win_rate": 27.5,
+      "rank": 107
      },
      {
       "arena": "models",
       "category": "uicomponent",
-      "elo": 1147,
-      "win_rate": 32.4,
-      "rank": 83
+      "elo": 1155,
+      "win_rate": 32.9,
+      "rank": 82
      },
      {
       "arena": "models",
       "category": "website",
-      "elo": 1167,
-      "win_rate": 35.6,
-      "rank": 86
+      "elo": 1160,
+      "win_rate": 34.8,
+      "rank": 88
      }
     ],
     "artificial_analysis": {
@@ -442,85 +585,6 @@
    ],
    "reasoning": {
     "mandatory": false
-   }
-  },
-  "liquid/lfm-2.5-2.6b:free": {
-   "id": "liquid/lfm-2.5-2.6b:free",
-   "canonical_slug": "liquid/lfm-2.5-2.6b-20260811",
-   "hugging_face_id": "LiquidAI/LFM2.5-2.6B",
-   "name": "LiquidAI: LFM2.5-2.6B (free)",
-   "created": 1786470519,
-   "description": "LFM2.5-2.6B is a compact reasoning model from Liquid AI. It is suited for agent workflows, data extraction, RAG, and long-context processing. Liquid advises against using it for agentic coding or...",
-   "context_length": 65536,
-   "architecture": {
-    "modality": "text->text",
-    "input_modalities": [
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "Other",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": "0",
-    "completion": "0"
-   },
-   "top_provider": {
-    "context_length": 65536,
-    "max_completion_tokens": 8192,
-    "is_moderated": false
-   },
-   "per_request_limits": null,
-   "supported_parameters": [
-    "frequency_penalty",
-    "include_reasoning",
-    "logprobs",
-    "max_completion_tokens",
-    "max_tokens",
-    "min_p",
-    "presence_penalty",
-    "reasoning",
-    "repetition_penalty",
-    "response_format",
-    "seed",
-    "stop",
-    "structured_outputs",
-    "temperature",
-    "tool_choice",
-    "tools",
-    "top_k",
-    "top_logprobs",
-    "top_p"
-   ],
-   "default_parameters": {
-    "temperature": 0.1,
-    "top_k": 50,
-    "repetition_penalty": 1.1
-   },
-   "supported_voices": null,
-   "knowledge_cutoff": null,
-   "expiration_date": "2026-11-13",
-   "links": {
-    "details": "/api/v1/models/liquid/lfm-2.5-2.6b-20260811/endpoints"
-   },
-   "endpoints": [
-    "/api/v1/chat/completions",
-    "/api/v1/completions",
-    "/api/v1/messages",
-    "/api/v1/responses"
-   ],
-   "benchmarks": {
-    "design_arena": [],
-    "artificial_analysis": {
-     "intelligence_index": null,
-     "coding_index": 7.7,
-     "agentic_index": null
-    }
-   },
-   "reasoning": {
-    "mandatory": true
    }
   },
   "nvidia/nemotron-3.5-lightning:free": {
@@ -727,58 +791,58 @@
      {
       "arena": "models",
       "category": "3d",
-      "elo": 1115,
-      "win_rate": 38,
-      "rank": 86
-     },
-     {
-      "arena": "models",
-      "category": "asciiart",
-      "elo": 1095,
-      "win_rate": 36.8,
-      "rank": 63
-     },
-     {
-      "arena": "models",
-      "category": "codecategories",
-      "elo": 1141,
-      "win_rate": 35.9,
-      "rank": 93
-     },
-     {
-      "arena": "models",
-      "category": "dataviz",
-      "elo": 1143,
-      "win_rate": 37.8,
-      "rank": 85
-     },
-     {
-      "arena": "models",
-      "category": "gamedev",
-      "elo": 1133,
-      "win_rate": 35.7,
-      "rank": 84
-     },
-     {
-      "arena": "models",
-      "category": "svg",
-      "elo": 1062,
-      "win_rate": 32,
-      "rank": 78
-     },
-     {
-      "arena": "models",
-      "category": "uicomponent",
-      "elo": 1135,
-      "win_rate": 36,
+      "elo": 1108,
+      "win_rate": 37.9,
       "rank": 89
      },
      {
       "arena": "models",
-      "category": "website",
-      "elo": 1141,
+      "category": "asciiart",
+      "elo": 1093,
+      "win_rate": 36.8,
+      "rank": 64
+     },
+     {
+      "arena": "models",
+      "category": "codecategories",
+      "elo": 1131,
+      "win_rate": 35.3,
+      "rank": 99
+     },
+     {
+      "arena": "models",
+      "category": "dataviz",
+      "elo": 1138,
+      "win_rate": 37.2,
+      "rank": 86
+     },
+     {
+      "arena": "models",
+      "category": "gamedev",
+      "elo": 1126,
+      "win_rate": 35.4,
+      "rank": 88
+     },
+     {
+      "arena": "models",
+      "category": "svg",
+      "elo": 1060,
+      "win_rate": 32.1,
+      "rank": 79
+     },
+     {
+      "arena": "models",
+      "category": "uicomponent",
+      "elo": 1126,
       "win_rate": 35.2,
-      "rank": 101
+      "rank": 95
+     },
+     {
+      "arena": "models",
+      "category": "website",
+      "elo": 1129,
+      "win_rate": 34.3,
+      "rank": 103
      }
     ],
     "artificial_analysis": {
@@ -1212,5 +1276,5 @@
   }
  },
  "source": "openrouter /api/v1/models",
- "fetched_at": "2026-11-12T09:08:09Z"
+ "fetched_at": "2026-11-14T13:01:21Z"
 }

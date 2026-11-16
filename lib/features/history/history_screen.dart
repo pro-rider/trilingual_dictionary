@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_tokens.dart';
 import 'history_provider.dart';
 
 /// Search history with clear-all (persisted in shared_preferences).
@@ -25,9 +26,9 @@ class HistoryScreen extends ConsumerWidget {
         ],
       ),
       body: history.isEmpty
-          ? const Center(
+          ? Center(
               child: Text('No searches yet',
-                  style: TextStyle(color: Color(0xFF64748B))),
+                  style: TextStyle(color: context.tokens.textMuted)),
             )
           : ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -36,7 +37,8 @@ class HistoryScreen extends ConsumerWidget {
               itemBuilder: (context, i) {
                 final h = history[i];
                 return ListTile(
-                  leading: const Icon(Icons.history, color: Color(0xFF0EA5E9)),
+                  leading: Icon(Icons.history,
+                      color: context.tokens.brandInk),
                   title: Text(h),
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: () => context.push(

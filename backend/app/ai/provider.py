@@ -448,6 +448,54 @@ def translate_gloss_queue_batch(
     return out
 
 
+def translate_gloss_zh_batch(
+    items: list[tuple[str, str, str]]
+) -> dict[str, dict[str, str]]:
+    """Translate English glosses into a short Chinese dictionary definition.
+
+    ``items`` is ``[(key, chinese_headword, english_gloss), ...]``. One call
+    returns the definition plus a literal English back-translation so the caller
+    can score the sense without a second round-trip. Deliberately narrow output
+    (two short fields, no examples) because the full 123k-entry backfill
+    multiplies every extra field by ~150k calls. Returns
+    ``{key: {"zh","back_en"}}``; a missing key means "retry later".
+    """
+    if not ai_enabled() or not items:
+        return {}
+    lines = "\n".join(f"{k}\t{zh}\t{en}" for k, zh, en in items)
+    prompt = (
+        "You are a Chinese lexicographer writing a learners' dictionary "
+        "(English / Simplified Chinese). Each line is "
+        "`key<TAB>chinese headword<TAB>english gloss`. For each line produce:\n"
+        "1. zh: a SHORT Simplified Chinese definition of that sense, 4-14 汉字, "
+        "dictionary style, no pinyin, no Latin letters, never just repeat the "
+        "headword, no trailing punctuation.\n"
+        "2. back_en: a literal English back-translation of that Chinese "
+        "definition, so a reviewer can check the sense survived.\n"
+        "Use the headword to pick the right sense of the English gloss. Respond "
+        "with STRICT JSON only:\n"
+        '{"items":[{"key":"<key>","zh":"<definition>","back_en":"<english>"}]}\n'
+        "Every key must appear exactly once. No prose.\n\n" + lines
+    )
+    text, _winner, _stats = _service.complete(prompt)
+    if not text:
+        return {}
+    raw = _extract_json(text) or {}
+    out_items = raw.get("items") if isinstance(raw, dict) else raw
+    out: dict[str, dict[str, str]] = {}
+    for item in out_items or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip()
+        if not key:
+            continue
+        out[key] = {
+            "zh": str(item.get("zh") or "").strip(),
+            "back_en": str(item.get("back_en") or "").strip(),
+        }
+    return out
+
+
 def define_words_batch(words: list[str]) -> dict[str, dict[str, str]]:
     """Give English meaning + pinyin + Nepali for words missing from any source.
 
